@@ -3,12 +3,13 @@
 Tensor::Tensor() : data(nullptr), grad(nullptr), parents(), backward_fn() {}
 
 Tensor::Tensor(const vector<int>& shape, bool requires_grad) : shape(shape), requires_grad(requires_grad) {
+    
     this->requires_grad = requires_grad;
     this->shape = shape;
     
     this->strides = compute_strides(shape);
 
-    this->data = new float[size()];  // Changed from int to float
+    this->data = new float[size()]();  // Changed from int to float
 
     if(requires_grad) {
         this->grad = make_shared<Tensor>(shape, false);
@@ -31,11 +32,24 @@ Tensor::Tensor(const vector<int>& shape, const vector<float>& data, bool require
     }
 }
 
-Tensor::Tensor(shared_ptr<Tensor> other) : Tensor(other->shape, other->requires_grad) {
-    this->data = other->data;
-    this->grad = other->grad;
-    this->parents = other->parents;
-    this->backward_fn = other->backward_fn;
+Tensor::Tensor(const vector<int>& shape, float* data, bool requires_grad) : Tensor(shape, requires_grad) {
+    for(int i=0; i<size(); i++){
+        this->data[i] = data[i];
+    }
+}
+
+Tensor::Tensor(shared_ptr<Tensor> other) : Tensor(other->shape, other->data, other->requires_grad) {
+
+    // if(requires_grad){
+    //     this->grad = make_shared<Tensor>(other->grad);
+    // } else {
+    //     this->grad = nullptr;
+    // }
+
+    // NOTICE HOW COPY CONSTRUCTOR DOESN'T COPY PARENTS AND BACKWARD FN
+    // ** ON PURPOSE, MAYBE CHANGE IN FUTURE, BUT PROB NOT **
+    // this->parents = other->parents;
+    // this->backward_fn = other->backward_fn;
 }
 
 // Should enable [0, 0, 0, ..., d_n, d_n-1, ..., d_1, d_0]
@@ -65,6 +79,13 @@ float& Tensor::at(vector<int> indices){
     return data[ind];
 }
 
+float& Tensor::at(int index) {
+    if(index < 0 || index >= size()) {
+        throw std::runtime_error("Index out of bounds");
+    }
+    return data[index];
+}
+
 int Tensor::size(){
     int cnt=1;
     for(int i=0; i<this->shape.size(); i++){
@@ -83,14 +104,27 @@ vector<int> Tensor::compute_strides(const vector<int>& shape) {
 }
 
 std::shared_ptr<Tensor> Tensor::reshape(const std::vector<int>& new_shape) {
-    int new_numel = 1;
-    for (int dim : new_shape) new_numel *= dim;
-    assert(new_numel == size());  // shapes must be compatible
 
-    auto reshaped = std::make_shared<Tensor>(shared_from_this());  // shallow copy
-    reshaped->shape = new_shape;
-    reshaped->strides = compute_strides(new_shape);  // recompute strides
-    return reshaped;
+    int cnt = 1;
+    for (int dim : new_shape) cnt *= dim;
+    
+    if(cnt!=size()){
+        throw std::runtime_error("Reshape size mismatch");
+    }
+
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad);
+
+    if(requires_grad) {
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [this, result]() {
+            // Reshape the gradient back to the original shape
+            auto reshaped_grad = result->grad->reshape(shape);
+            reshaped_grad->requires_grad = false;
+            this->grad = this->grad + reshaped_grad;
+        };
+    }
+
+    return result;
 }
 
 // void Tensor::backward() {
@@ -141,6 +175,7 @@ std::shared_ptr<Tensor> Tensor::reshape(const std::vector<int>& new_shape) {
 //     }
 // }
 
+// Assumes keepdims == true
 shared_ptr<Tensor> Tensor::sum(int axis, bool keepdims) {
     vector<int> new_shape;
     for(int i=0; i<shape.size(); i++){
@@ -154,40 +189,132 @@ shared_ptr<Tensor> Tensor::sum(int axis, bool keepdims) {
     }
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
-    
-    // Anonymous lambda function
-    // Must capture itself, since needs to call itself recursively
-    function<void(shared_ptr<Tensor>, shared_ptr<Tensor>, vector<int>, int, int)> rec = 
-        [&](shared_ptr<Tensor> A, shared_ptr<Tensor> result, vector<int> acc, int axis, int ind) {
-            if(ind==result->shape.size()){
-                float val=0;
-                vector<int> acc_A(acc);
-                acc_A[axis]=0;
-                for(int i=0; i<A->shape[axis]; i++){
-                    val+=A->at(acc_A);
-                    acc_A[axis]++;
-                }
-                result->at(acc)=val;
-                return;
-            }
 
-            for(int i=0; i<result->shape[ind]; i++){
-                vector<int> new_acc(acc);
-                new_acc.push_back(i);
-                rec(A, result, new_acc, axis, ind+1);
-            }
+    for(int i=0; i<result->size(); i++){
+        for(int j=0; j<shape[axis]; j++){
+            result->at(i)+=at(i+j*strides[axis]);
+        }
+    }
+
+    if(requires_grad){
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [this, result]() {
+            this->grad = this->grad + result->grad->broadcast(shape);
         };
+    }
 
-    rec(shared_from_this(), result, vector<int>(), axis, 0);
     return result;
+    
+    // // Anonymous lambda function
+    // // Must capture itself, since needs to call itself recursively
+    // function<void(shared_ptr<Tensor>, shared_ptr<Tensor>, vector<int>, int, int)> rec = 
+    //     [&](shared_ptr<Tensor> A, shared_ptr<Tensor> result, vector<int> acc, int axis, int ind) {
+    //         if(ind==result->shape.size()){
+    //             float val=0;
+    //             vector<int> acc_A(acc);
+    //             acc_A[axis]=0;
+    //             for(int i=0; i<A->shape[axis]; i++){
+    //                 val+=A->at(acc_A);
+    //                 acc_A[axis]++;
+    //             }
+    //             result->at(acc)=val;
+    //             return;
+    //         }
+
+    //         for(int i=0; i<result->shape[ind]; i++){
+    //             vector<int> new_acc(acc);
+    //             new_acc.push_back(i);
+    //             rec(A, result, new_acc, axis, ind+1);
+    //         }
+    //     };
+
+    // rec(shared_from_this(), result, vector<int>(), axis, 0);
+    // return result;
 
     // NO BACKWARD FUNCTION IMPLEMENTED RN
+}
+
+bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul) {
+    vector<int> new_shape;
+    int d = max(A_shape.size(), B_shape.size());
+    for(int i=abs((int)(A_shape.size()-B_shape.size())); i<d-2*matmul; i++){
+        if(A_shape[i-(d-A_shape.size())]==1||B_shape[i-(d-A_shape.size())]==1){
+            continue;
+        } else if(A_shape[i-(d-A_shape.size())]!=B_shape[i-(d-A_shape.size())]){
+            return false;
+        }
+    }
+    return true;
+}
+
+// ** IMPORTANT **
+// ** IF MAT_MUL IS TRUE, YOU ARE EXPECTED TO ADD THE LAST TWO DIMENSIONS MANUALLY, SINCE THEY'RE DIFFERENT **
+vector<int> get_broadcast_shape(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul) {
+    if(!is_broadcastable(A_shape, B_shape, matmul)) {
+        throw std::runtime_error("Broadcast shape mismatch");
+    }
+
+    vector<int> new_shape;
+    int d = max(A_shape.size(), B_shape.size());
+    
+    // Handle broadcasting of leading dimensions
+    for(int i=abs((int)(A_shape.size()-B_shape.size())); i<d-2*matmul; i++) {
+        new_shape.push_back(max(A_shape[i-(d-A_shape.size())], B_shape[i-(d-A_shape.size())]));
+    }
+    return new_shape;
+}
+
+shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) {
+    if(!is_broadcastable(shape, new_shape, matmul)) {
+        throw std::runtime_error("Broadcast shape mismatch");
+    }
+
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+
+    for(int i=0; i<result->size(); i++) {
+        int curr = i;
+        int idx = i;
+        for(int j=0; j<shape.size()-2*matmul; j++) {
+            idx-=result->strides[j]*(curr/result->strides[j]);
+            if(!(shape[j]==1&&new_shape[j]!=1)) {
+                idx+=strides[j]*(curr/result->strides[j]);
+            }
+            curr %= result->strides[j];
+        }
+
+        result->at(i) = at(idx);
+    }
+
+    if(requires_grad) {
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [this, result]() {
+            // Sum gradients across broadcasted dimensions
+            auto reduced_grad = result->grad->reduce_to_shape(shape);
+            reduced_grad->requires_grad = false;
+            this->grad = this->grad + reduced_grad;
+        };
+    }
+
+    return result;
 }
 
 shared_ptr<Tensor> Tensor::reduce_to_shape(const vector<int>& target_shape) {
 
     if(target_shape.size() > shape.size()){
         throw std::runtime_error("Target shape size mismatch");
+    }
+
+    if(target_shape.size() == shape.size()){
+        bool same = true;
+        for(int i=0; i<target_shape.size(); i++){
+            if(target_shape[i]!=shape[i]){
+                same = false;
+                break;
+            }
+        }
+        if(same){
+            return shared_from_this();
+        }
     }
     
     vector<int> new_shape;
@@ -201,9 +328,9 @@ shared_ptr<Tensor> Tensor::reduce_to_shape(const vector<int>& target_shape) {
         new_shape.push_back(target_shape[i]);
     }
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(shared_from_this());
+    shared_ptr<Tensor> result = shared_from_this();
     for(int i=0; i<new_shape.size(); i++) {
-        if(new_shape[i]==1 && shape[i]>1) {
+        if(new_shape[i]==1 && shape[i]!=1) {
             result = result->sum(i, true);
         } else if(new_shape[i] == shape[i]) {
             continue;
@@ -288,6 +415,11 @@ shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     add(A, B, result, dims_A, dims_B, vector<int>(), 0);
 
     if(A->requires_grad || B->requires_grad){
+
+        // ** If parent's don't require grad, then don't add them?
+        result->parents.push_back(A);
+        result->parents.push_back(B);
+
         result->backward_fn = [A, B, result](){
             if(A->requires_grad && A->grad!=nullptr){
                 auto reduced_grad = result->grad->reduce_to_shape(A->shape);
@@ -350,7 +482,7 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
             for(int i=0; i<max(dims_A[ind], dims_B[ind]); i++){
                 vector<int> new_acc(acc);
                 new_acc.push_back(i);
-                add(A, B, C, dims_A, dims_B, new_acc, ind+1);
+                subtract(A, B, C, dims_A, dims_B, new_acc, ind+1);
             }
         };
 
@@ -375,6 +507,10 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     subtract(A, B, result, dims_A, dims_B, vector<int>(), 0);
 
     if(A->requires_grad || B->requires_grad){
+
+        result->parents.push_back(A);
+        result->parents.push_back(B);
+
         result->backward_fn = [A, B, result](){
             if(A->requires_grad && A->grad!=nullptr){
                 auto reduced_grad = result->grad->reduce_to_shape(A->shape);
@@ -392,24 +528,85 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
 }
 
 shared_ptr<Tensor>& operator+=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
-    auto result = A + B;
-    A->data = result->data;
-    A->shape = result->shape;
-    A->strides = result->strides;
-    A->grad = result->grad;
-    A->backward_fn = result->backward_fn;
+
+    // Manages memory and references carefully
+    A = A + B;
     return A;
 }
 
 shared_ptr<Tensor>& operator-=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
-    auto result = A - B;
-    A->data = result->data;
-    A->shape = result->shape;
-    A->strides = result->strides;
-    A->grad = result->grad;
-    A->backward_fn = result->backward_fn;
+    
+    // Manages memory and references carefully
+    A = A - B;
     return A;
 }
+
+shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
+    
+    // Must be at least 2 dimensions for transpose
+    if(shape.size()<2){
+        throw std::runtime_error("Tensor must have at least 2 dimensions");
+    }
+
+    // Check bounds
+    if((dim1>0&&dim1>=shape.size())||
+    (dim1<0&&dim1<-shape.size())||
+    (dim2>0&&dim2>=shape.size())||
+    (dim2<0&&dim2<-shape.size())){
+        throw std::runtime_error("Invalid dimension");
+    }
+
+    // If equal, then same as original tensor
+    if(dim1==dim2){
+        return shared_from_this();
+    }
+
+    // Convert negative indices to positive
+    if(dim1<0){
+        dim1+=shape.size();
+    }
+    if(dim2<0){
+        dim2+=shape.size();
+    }
+    // printf("dim1: %d, dim2: %d\n", dim1, dim2);
+    vector<int> new_shape(shape);
+    swap(new_shape[dim1], new_shape[dim2]);
+    // cout<<"new_shape: ";
+    // for(int i=0; i<new_shape.size(); i++){
+    //     cout<<new_shape[i]<<" ";
+    // }
+    // cout<<endl;
+
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad);
+
+    if(requires_grad){
+
+        result->parents.push_back(shared_from_this());
+
+        result->backward_fn = [dim1, dim2, result, this](){
+            // printf("result->grad->shape: ");
+            // for(int i=0; i<result->grad->shape.size(); i++){
+            //     printf("%d ", result->grad->shape[i]);
+            // }
+            // printf("\n");
+            auto temp = result->grad->transpose(dim1, dim2);
+            // printf("temp.shape: ");
+            // for(int i=0; i<temp->shape.size(); i++){
+            //     printf("%d ", temp->shape[i]);
+            // }
+            // printf("\n");
+            // printf("this->shape: ");
+            // for(int i=0; i<this->shape.size(); i++){
+            //     printf("%d ", this->shape[i]);
+            // }
+            // printf("\n");
+            this->grad += temp;
+        };
+    }
+
+    return result;
+}
+    
 
 void Tensor::print() {
     // Helper function to print a single value with proper formatting

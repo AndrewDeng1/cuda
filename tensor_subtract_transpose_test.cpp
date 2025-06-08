@@ -1,5 +1,3 @@
-// it works 😝
-
 #include "tensor.h"
 #include <iostream>
 
@@ -142,10 +140,19 @@ int main() {
     auto a6 = make_shared<Tensor>(vector<int>{1, 1, 1, 1}, vector<float>{1.0f}, true);
     auto a7 = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}, true);
 
-    auto a8 = a6+a7;
+    // a6+=a7;
+    // auto a8=a6;
+    auto a8 = a7-a6;
     a8->print();
     a8->grad = make_shared<Tensor>(vector<int>{1, 1, 2, 3}, vector<float>{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}, true);
     a8->backward_fn();
     a6->grad->print();
     a7->grad->print();
-} 
+
+    a8->print();
+    auto a9 = a8->transpose(-2, -1);
+    a9->print();
+    a9->grad = make_shared<Tensor>(vector<int>{1, 1, 3, 2}, vector<float>{10.0f, 10.0f, 10.0f, 10.0f, 10.0f, 10.0f}, true);
+    a9->backward_fn();
+    a8->grad->print();
+}
