@@ -235,12 +235,14 @@ shared_ptr<Tensor> Tensor::sum(int axis, bool keepdims) {
 }
 
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul) {
-    vector<int> new_shape;
     int d = max(A_shape.size(), B_shape.size());
-    for(int i=abs((int)(A_shape.size()-B_shape.size())); i<d-2*matmul; i++){
-        if(A_shape[i-(d-A_shape.size())]==1||B_shape[i-(d-A_shape.size())]==1){
+    for(int i = 0; i < d-2*matmul; i++) {
+        int dim_A = (i < d-A_shape.size()) ? 1 : A_shape[i-(d-A_shape.size())];
+        int dim_B = (i < d-B_shape.size()) ? 1 : B_shape[i-(d-B_shape.size())];
+        
+        if(dim_A == 1 || dim_B == 1) {
             continue;
-        } else if(A_shape[i-(d-A_shape.size())]!=B_shape[i-(d-A_shape.size())]){
+        } else if(dim_A != dim_B) {
             return false;
         }
     }
@@ -256,11 +258,24 @@ vector<int> get_broadcast_shape(const vector<int>& A_shape, const vector<int>& B
 
     vector<int> new_shape;
     int d = max(A_shape.size(), B_shape.size());
-    
-    // Handle broadcasting of leading dimensions
-    for(int i=abs((int)(A_shape.size()-B_shape.size())); i<d-2*matmul; i++) {
-        new_shape.push_back(max(A_shape[i-(d-A_shape.size())], B_shape[i-(d-A_shape.size())]));
+    for(int i=0; i<d-2*matmul; i++){
+        if(i<d-A_shape.size()){
+            new_shape.push_back(B_shape[i]);
+        } else if(i<d-B_shape.size()){
+            new_shape.push_back(A_shape[i]);
+        } else {
+            if(A_shape[i-(d-A_shape.size())]==1){
+                new_shape.push_back(B_shape[i-(d-B_shape.size())]);
+            } else if(B_shape[i-(d-B_shape.size())]==1){
+                new_shape.push_back(A_shape[i-(d-A_shape.size())]);
+            } else if(A_shape[i-(d-A_shape.size())]==B_shape[i-(d-B_shape.size())]){
+                new_shape.push_back(A_shape[i-(d-A_shape.size())]);
+            } else {
+                throw invalid_argument("Shape mismatch");
+            }
+        }
     }
+
     return new_shape;
 }
 
@@ -271,17 +286,29 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
 
+    // Create padded shape and strides
+    vector<int> padded_shape = shape;
+    vector<int> padded_strides = strides;
+    
+    // Pad with 1s at the beginning if needed
+    while(padded_shape.size() < new_shape.size()) {
+        padded_shape.insert(padded_shape.begin(), 1);
+        padded_strides.insert(padded_strides.begin(), 0);  // Stride of 0 for size-1 dimensions
+    }
+
     for(int i=0; i<result->size(); i++) {
         int curr = i;
-        int idx = i;
-        for(int j=0; j<shape.size()-2*matmul; j++) {
-            idx-=result->strides[j]*(curr/result->strides[j]);
-            if(!(shape[j]==1&&new_shape[j]!=1)) {
-                idx+=strides[j]*(curr/result->strides[j]);
-            }
+        int idx = 0;
+        for(int j=0; j<new_shape.size()-2*matmul; j++) {
+            int dim = curr/result->strides[j];
             curr %= result->strides[j];
+            
+            if(padded_shape[j] == 1) {
+                idx += 0;  // Don't add to index for broadcasted dimensions
+            } else {
+                idx += padded_strides[j] * dim;
+            }
         }
-
         result->at(i) = at(idx);
     }
 
@@ -345,74 +372,24 @@ shared_ptr<Tensor> Tensor::reduce_to_shape(const vector<int>& target_shape) {
 
 shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
 
-    vector<int> new_shape;
-    int d = max(A->shape.size(), B->shape.size());
-    for(int i=0; i<d; i++){
-        if(i<d-A->shape.size()){
-            new_shape.push_back(B->shape[i]);
-        } else if(i<d-B->shape.size()){
-            new_shape.push_back(A->shape[i]);
-        } else {
-            if(A->shape[i-(d-A->shape.size())]==1){
-                new_shape.push_back(B->shape[i-(d-B->shape.size())]);
-            } else if(B->shape[i-(d-B->shape.size())]==1){
-                new_shape.push_back(A->shape[i-(d-A->shape.size())]);
-            } else if(A->shape[i-(d-A->shape.size())]==B->shape[i-(d-B->shape.size())]){
-                new_shape.push_back(A->shape[i-(d-A->shape.size())]);
-            } else {
-                throw invalid_argument("Shape mismatch");
-            }
-        }
+    if(!is_broadcastable(A->shape, B->shape, false)){
+        throw invalid_argument("Shape mismatch");
+    }
+
+    vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
+
+    shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
+    shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
+
+    if(new_A->size()!=new_B->size()){
+        throw std::runtime_error("Broadcast size mismatch");
     }
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
-    
-    // Convert add to a lambda function
-    function<void(shared_ptr<Tensor>, shared_ptr<Tensor>, shared_ptr<Tensor>, vector<int>&, vector<int>&, vector<int>, int)> add = 
-        [&](shared_ptr<Tensor> A, shared_ptr<Tensor> B, shared_ptr<Tensor> C, vector<int>& dims_A, vector<int>& dims_B, vector<int> acc, int ind) {
-            if(ind==dims_A.size()){
-                vector<int> acc_A(acc);
-                for(int i=0; i<acc_A.size(); i++){
-                    if(dims_A[i]==1){
-                        acc_A[i]=0;
-                    }
-                }
-                vector<int> acc_B(acc);
-                for(int i=0; i<acc_B.size(); i++){
-                    if(dims_B[i]==1){
-                        acc_B[i]=0;
-                    }
-                }
-                C->at(acc)=A->at(acc_A)+B->at(acc_B);
-                return;
-            }
 
-            for(int i=0; i<max(dims_A[ind], dims_B[ind]); i++){
-                vector<int> new_acc(acc);
-                new_acc.push_back(i);
-                add(A, B, C, dims_A, dims_B, new_acc, ind+1);
-            }
-        };
-
-    vector<int> dims_A(d);
-    vector<int> dims_B(d);
-    
-    // Fill dims_A and dims_B with appropriate dimensions
-    for(int i=0; i<d; i++) {
-        if(i < d-A->shape.size()) {
-            dims_A[i] = 1;
-        } else {
-            dims_A[i] = A->shape[i-(d-A->shape.size())];
-        }
-        
-        if(i < d-B->shape.size()) {
-            dims_B[i] = 1;
-        } else {
-            dims_B[i] = B->shape[i-(d-B->shape.size())];
-        }
+    for(int i=0; i<new_A->size(); i++){
+        result->at(i) = new_A->at(i) + new_B->at(i);
     }
-    
-    add(A, B, result, dims_A, dims_B, vector<int>(), 0);
 
     if(A->requires_grad || B->requires_grad){
 
@@ -422,110 +399,221 @@ shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
 
         result->backward_fn = [A, B, result](){
             if(A->requires_grad && A->grad!=nullptr){
-                auto reduced_grad = result->grad->reduce_to_shape(A->shape);
-                reduced_grad->requires_grad = false;
-                A->grad = A->grad + reduced_grad;
+                A->grad += result->grad->reduce_to_shape(A->shape);
             }
             if(B->requires_grad && B->grad!=nullptr){
-                auto reduced_grad = result->grad->reduce_to_shape(B->shape);
-                reduced_grad->requires_grad = false;
-                B->grad = B->grad + reduced_grad;
+                B->grad += result->grad->reduce_to_shape(B->shape);
             }
         };
     }
+
     return result;
+
+
+
+    // vector<int> new_shape;
+    // int d = max(A->shape.size(), B->shape.size());
+    // for(int i=0; i<d; i++){
+    //     if(i<d-A->shape.size()){
+    //         new_shape.push_back(B->shape[i]);
+    //     } else if(i<d-B->shape.size()){
+    //         new_shape.push_back(A->shape[i]);
+    //     } else {
+    //         if(A->shape[i-(d-A->shape.size())]==1){
+    //             new_shape.push_back(B->shape[i-(d-B->shape.size())]);
+    //         } else if(B->shape[i-(d-B->shape.size())]==1){
+    //             new_shape.push_back(A->shape[i-(d-A->shape.size())]);
+    //         } else if(A->shape[i-(d-A->shape.size())]==B->shape[i-(d-B->shape.size())]){
+    //             new_shape.push_back(A->shape[i-(d-A->shape.size())]);
+    //         } else {
+    //             throw invalid_argument("Shape mismatch");
+    //         }
+    //     }
+    // }
+
+    // shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
+    
+    // // Convert add to a lambda function
+    // function<void(shared_ptr<Tensor>, shared_ptr<Tensor>, shared_ptr<Tensor>, vector<int>&, vector<int>&, vector<int>, int)> add = 
+    //     [&](shared_ptr<Tensor> A, shared_ptr<Tensor> B, shared_ptr<Tensor> C, vector<int>& dims_A, vector<int>& dims_B, vector<int> acc, int ind) {
+    //         if(ind==dims_A.size()){
+    //             vector<int> acc_A(acc);
+    //             for(int i=0; i<acc_A.size(); i++){
+    //                 if(dims_A[i]==1){
+    //                     acc_A[i]=0;
+    //                 }
+    //             }
+    //             vector<int> acc_B(acc);
+    //             for(int i=0; i<acc_B.size(); i++){
+    //                 if(dims_B[i]==1){
+    //                     acc_B[i]=0;
+    //                 }
+    //             }
+    //             C->at(acc)=A->at(acc_A)+B->at(acc_B);
+    //             return;
+    //         }
+
+    //         for(int i=0; i<max(dims_A[ind], dims_B[ind]); i++){
+    //             vector<int> new_acc(acc);
+    //             new_acc.push_back(i);
+    //             add(A, B, C, dims_A, dims_B, new_acc, ind+1);
+    //         }
+    //     };
+
+    // vector<int> dims_A(d);
+    // vector<int> dims_B(d);
+    
+    // // Fill dims_A and dims_B with appropriate dimensions
+    // for(int i=0; i<d; i++) {
+    //     if(i < d-A->shape.size()) {
+    //         dims_A[i] = 1;
+    //     } else {
+    //         dims_A[i] = A->shape[i-(d-A->shape.size())];
+    //     }
+        
+    //     if(i < d-B->shape.size()) {
+    //         dims_B[i] = 1;
+    //     } else {
+    //         dims_B[i] = B->shape[i-(d-B->shape.size())];
+    //     }
+    // }
+    
+    // add(A, B, result, dims_A, dims_B, vector<int>(), 0);
 }
 
 shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
-    vector<int> new_shape;
-    int d = max(A->shape.size(), B->shape.size());
-    for(int i=0; i<d; i++){
-        if(i<d-A->shape.size()){
-            new_shape.push_back(B->shape[i]);
-        } else if(i<d-B->shape.size()){
-            new_shape.push_back(A->shape[i]);
-        } else {
-            if(A->shape[i-(d-A->shape.size())]==1){
-                new_shape.push_back(B->shape[i-(d-B->shape.size())]);
-            } else if(B->shape[i-(d-B->shape.size())]==1){
-                new_shape.push_back(A->shape[i-(d-A->shape.size())]);
-            } else if(A->shape[i-(d-A->shape.size())]==B->shape[i-(d-B->shape.size())]){
-                new_shape.push_back(A->shape[i-(d-A->shape.size())]);
-            } else {
-                throw invalid_argument("Shape mismatch");
-            }
-        }
+    if(!is_broadcastable(A->shape, B->shape, false)){
+        throw invalid_argument("Shape mismatch");
     }
+
+    vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
+
+    shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
+    shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
-    
-    // Convert subtract to a lambda function
-    function<void(shared_ptr<Tensor>, shared_ptr<Tensor>, shared_ptr<Tensor>, vector<int>&, vector<int>&, vector<int>, int)> subtract = 
-        [&](shared_ptr<Tensor> A, shared_ptr<Tensor> B, shared_ptr<Tensor> C, vector<int>& dims_A, vector<int>& dims_B, vector<int> acc, int ind) {
-            if(ind==dims_A.size()){
-                vector<int> acc_A(acc);
-                for(int i=0; i<acc_A.size(); i++){
-                    if(dims_A[i]==1){
-                        acc_A[i]=0;
-                    }
-                }
-                vector<int> acc_B(acc);
-                for(int i=0; i<acc_B.size(); i++){
-                    if(dims_B[i]==1){
-                        acc_B[i]=0;
-                    }
-                }
-                C->at(acc)=A->at(acc_A)-B->at(acc_B);
-                return;
-            }
 
-            for(int i=0; i<max(dims_A[ind], dims_B[ind]); i++){
-                vector<int> new_acc(acc);
-                new_acc.push_back(i);
-                subtract(A, B, C, dims_A, dims_B, new_acc, ind+1);
-            }
-        };
-
-    vector<int> dims_A(d);
-    vector<int> dims_B(d);
-    
-    // Fill dims_A and dims_B with appropriate dimensions
-    for(int i=0; i<d; i++) {
-        if(i < d-A->shape.size()) {
-            dims_A[i] = 1;
-        } else {
-            dims_A[i] = A->shape[i-(d-A->shape.size())];
-        }
-        
-        if(i < d-B->shape.size()) {
-            dims_B[i] = 1;
-        } else {
-            dims_B[i] = B->shape[i-(d-B->shape.size())];
-        }
+    for(int i=0; i<new_A->size(); i++){
+        result->at(i) = new_A->at(i) - new_B->at(i);
     }
-    
-    subtract(A, B, result, dims_A, dims_B, vector<int>(), 0);
 
     if(A->requires_grad || B->requires_grad){
 
+        // ** If parent's don't require grad, then don't add them?
         result->parents.push_back(A);
         result->parents.push_back(B);
 
         result->backward_fn = [A, B, result](){
             if(A->requires_grad && A->grad!=nullptr){
-                auto reduced_grad = result->grad->reduce_to_shape(A->shape);
-                reduced_grad->requires_grad = false;
-                A->grad = A->grad + reduced_grad;
+                A->grad += result->grad->reduce_to_shape(A->shape);
             }
             if(B->requires_grad && B->grad!=nullptr){
-                auto reduced_grad = result->grad->reduce_to_shape(B->shape);
-                reduced_grad->requires_grad = false;
-                B->grad = B->grad - reduced_grad;
+                B->grad += result->grad->reduce_to_shape(B->shape);
             }
         };
     }
+    
     return result;
+    // vector<int> new_shape;
+    // int d = max(A->shape.size(), B->shape.size());
+    // for(int i=0; i<d; i++){
+    //     if(i<d-A->shape.size()){
+    //         new_shape.push_back(B->shape[i]);
+    //     } else if(i<d-B->shape.size()){
+    //         new_shape.push_back(A->shape[i]);
+    //     } else {
+    //         if(A->shape[i-(d-A->shape.size())]==1){
+    //             new_shape.push_back(B->shape[i-(d-B->shape.size())]);
+    //         } else if(B->shape[i-(d-B->shape.size())]==1){
+    //             new_shape.push_back(A->shape[i-(d-A->shape.size())]);
+    //         } else if(A->shape[i-(d-A->shape.size())]==B->shape[i-(d-B->shape.size())]){
+    //             new_shape.push_back(A->shape[i-(d-A->shape.size())]);
+    //         } else {
+    //             throw invalid_argument("Shape mismatch");
+    //         }
+    //     }
+    // }
+
+    // shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
+    
+    // // Convert subtract to a lambda function
+    // function<void(shared_ptr<Tensor>, shared_ptr<Tensor>, shared_ptr<Tensor>, vector<int>&, vector<int>&, vector<int>, int)> subtract = 
+    //     [&](shared_ptr<Tensor> A, shared_ptr<Tensor> B, shared_ptr<Tensor> C, vector<int>& dims_A, vector<int>& dims_B, vector<int> acc, int ind) {
+    //         if(ind==dims_A.size()){
+    //             vector<int> acc_A(acc);
+    //             for(int i=0; i<acc_A.size(); i++){
+    //                 if(dims_A[i]==1){
+    //                     acc_A[i]=0;
+    //                 }
+    //             }
+    //             vector<int> acc_B(acc);
+    //             for(int i=0; i<acc_B.size(); i++){
+    //                 if(dims_B[i]==1){
+    //                     acc_B[i]=0;
+    //                 }
+    //             }
+    //             C->at(acc)=A->at(acc_A)-B->at(acc_B);
+    //             return;
+    //         }
+
+    //         for(int i=0; i<max(dims_A[ind], dims_B[ind]); i++){
+    //             vector<int> new_acc(acc);
+    //             new_acc.push_back(i);
+    //             subtract(A, B, C, dims_A, dims_B, new_acc, ind+1);
+    //         }
+    //     };
+
+    // vector<int> dims_A(d);
+    // vector<int> dims_B(d);
+    
+    // // Fill dims_A and dims_B with appropriate dimensions
+    // for(int i=0; i<d; i++) {
+    //     if(i < d-A->shape.size()) {
+    //         dims_A[i] = 1;
+    //     } else {
+    //         dims_A[i] = A->shape[i-(d-A->shape.size())];
+    //     }
+        
+    //     if(i < d-B->shape.size()) {
+    //         dims_B[i] = 1;
+    //     } else {
+    //         dims_B[i] = B->shape[i-(d-B->shape.size())];
+    //     }
+    // }
+    
+    // subtract(A, B, result, dims_A, dims_B, vector<int>(), 0);
+
+    // if(A->requires_grad || B->requires_grad){
+
+    //     result->parents.push_back(A);
+    //     result->parents.push_back(B);
+
+    //     result->backward_fn = [A, B, result](){
+    //         if(A->requires_grad && A->grad!=nullptr){
+    //             auto reduced_grad = result->grad->reduce_to_shape(A->shape);
+    //             reduced_grad->requires_grad = false;
+    //             A->grad = A->grad + reduced_grad;
+    //         }
+    //         if(B->requires_grad && B->grad!=nullptr){
+    //             auto reduced_grad = result->grad->reduce_to_shape(B->shape);
+    //             reduced_grad->requires_grad = false;
+    //             B->grad = B->grad - reduced_grad;
+    //         }
+    //     };
+    // }
+    // return result;
 }
+
+// shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+    
+//     if(A->shape.size()!=B->shape.size()){
+//         throw invalid_argument("Shape mismatch");
+//     }
+
+//     for(int i=0; i<A->shape.size(); i++){
+//         if(A->shape[i]!=B->shape[i]){
+    
+// }
 
 shared_ptr<Tensor>& operator+=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
 
@@ -568,14 +656,9 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
     if(dim2<0){
         dim2+=shape.size();
     }
-    // printf("dim1: %d, dim2: %d\n", dim1, dim2);
+
     vector<int> new_shape(shape);
     swap(new_shape[dim1], new_shape[dim2]);
-    // cout<<"new_shape: ";
-    // for(int i=0; i<new_shape.size(); i++){
-    //     cout<<new_shape[i]<<" ";
-    // }
-    // cout<<endl;
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad);
 
@@ -584,23 +667,7 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
         result->parents.push_back(shared_from_this());
 
         result->backward_fn = [dim1, dim2, result, this](){
-            // printf("result->grad->shape: ");
-            // for(int i=0; i<result->grad->shape.size(); i++){
-            //     printf("%d ", result->grad->shape[i]);
-            // }
-            // printf("\n");
-            auto temp = result->grad->transpose(dim1, dim2);
-            // printf("temp.shape: ");
-            // for(int i=0; i<temp->shape.size(); i++){
-            //     printf("%d ", temp->shape[i]);
-            // }
-            // printf("\n");
-            // printf("this->shape: ");
-            // for(int i=0; i<this->shape.size(); i++){
-            //     printf("%d ", this->shape[i]);
-            // }
-            // printf("\n");
-            this->grad += temp;
+            this->grad += result->grad->transpose(dim1, dim2);
         };
     }
 
