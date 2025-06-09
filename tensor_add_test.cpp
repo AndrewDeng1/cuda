@@ -11,62 +11,10 @@ int main() {
     vector<int> shape = {2, 4, 3};
     vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f, 19.0f, 20.0f, 21.0f, 22.0f, 23.0f, 24.0f};
     auto t1 = make_shared<Tensor>(shape, data, true);
-    // cout << t1->size() << endl;
-    // cout << t1->at({0, 0, 0}) << endl;
-    // cout << t1->at({1, 0, 0}) << endl;
-    // cout << t1->at({0, 1, 0}) << endl;
-    // cout << t1->at({1, 1, 0}) << endl;
-    // cout << t1->at({0, 2, 0}) << endl;
-    // cout << t1->at({1, 2, 0}) << endl;
-    // cout << t1->at({0, 3, 0}) << endl;
-    // cout << t1->at({1, 3, 0}) << endl;
-    // cout << t1->at({0, 0, 0, 2}) << endl;
     auto t2 = t1->reshape({2, 3, 4});
     auto t3 = t2->reshape({2, 12});
-    // cout << t3->at({0, 0}) << endl;   
-    // cout << t3->at({0, 1}) << endl;
-    // cout << t3->at({0, 2}) << endl;
-    // cout << t3->at({0, 3}) << endl;
-    // cout << t3->at({0, 4}) << endl;
-    // cout << t3->at({0, 5}) << endl;
-    // cout << t3->at({0, 6}) << endl;
-    // cout << t3->at({0, 7}) << endl;
-    // cout << t3->at({0, 8}) << endl;
-    // cout << t3->at({0, 9}) << endl;
-    // cout << t3->at({0, 10}) << endl;
-    // cout << t3->at({0, 11}) << endl;
-    // cout << t3->at({1, 0}) << endl;   
-    // cout << t3->at({1, 1}) << endl;
-    // cout << t3->at({1, 2}) << endl;
-    // cout << t3->at({1, 3}) << endl;
-    // cout << t3->at({1, 4}) << endl;
-    // cout << t3->at({1, 5}) << endl;
-    // cout << t3->at({1, 6}) << endl;
-    // cout << t3->at({1, 7}) << endl;
-    // cout << t3->at({1, 8}) << endl;
-    // cout << t3->at({1, 9}) << endl;
-    // cout << t3->at({1, 10}) << endl;
-    // cout << t3->at({1, 11}) << endl;
     auto t4 = t3->sum(0, true);
-    // cout << t4->shape[0] << endl;
-    // cout << t4->shape[1] << endl;
-    // cout << t4->at({0, 0}) << endl;
-    // cout << t4->at({0, 1}) << endl;
-    // cout << t4->at({0, 2}) << endl;
-    // cout << t4->at({0, 3}) << endl;
-    // cout << t4->at({0, 4}) << endl;
-    // cout << t4->at({0, 5}) << endl;
-    // cout << t4->at({0, 6}) << endl;
-    // cout << t4->at({0, 7}) << endl;
-    // cout << t4->at({0, 8}) << endl;
-    // cout << t4->at({0, 9}) << endl;
-    // cout << t4->at({0, 10}) << endl;
-    // cout << t4->at({0, 11}) << endl;
     auto t5 = t3->sum(1, true);
-    // cout << t5->shape[0] << endl;
-    // cout << t5->shape[1] << endl;
-    // cout << t5->at({0, 0}) << endl;
-    // cout << t5->at({1, 0}) << endl;
 
     int sm1=0;
     int sm2=0;
@@ -78,21 +26,7 @@ int main() {
     // cout << sm2 << endl;
 
     auto t6 = t1->sum(1, true);
-    // printf("t6 shape: %d, %d, %d\n", t6->shape[0], t6->shape[1], t6->shape[2]);
-    
-    // for(int i=0; i<t6->shape[0]; i++){
-    //     for(int j=0; j<t6->shape[2]; j++){
-    //         cout<<t6->at({i, 0, j})<<endl;
-    //     }
-    // }
-
     auto t7 = t1->reduce_to_shape({2, 1, 1});
-    // printf("t7 shape: %d, %d, %d\n", t7->shape[0], t7->shape[1], t7->shape[2]);
-    // cout<<t7->at({0, 0, 0})<<endl;
-    // cout<<t7->at({1, 0, 0})<<endl;
-    
-    // printf("t1 shape: %d, %d, %d\n", t1->shape[0], t1->shape[1], t1->shape[2]);
-    // printf("t7 shape: %d, %d, %d\n", t7->shape[0], t7->shape[1], t7->shape[2]);
     auto t8 = t1 + t7;
 
     auto a1 = make_shared<Tensor>(vector<int>{2, 1, 3}, vector<float>{1.0f, 100.0f, 1000.0f, 750.0f, 500.0f, 5000.0f}, true);
@@ -115,7 +49,7 @@ int main() {
     a5->print();
     a5->grad = make_shared<Tensor>(vector<int>{2, 3, 3}, vector<float>{1000.0f, 2000.0f, 3000.0f, 4000.0f, 5000.0f, 6000.0f, 7000.0f, 8000.0f, 9000.0f, 10000.0f, 11000.0f, 12000.0f, 13000.0f, 14000.0f, 15000.0f, 16000.0f, 17000.0f, 18000.0f}, true);
     a5->grad->print();
-    a5->backward_fn();
+    a5->backward();
     a3->grad->print();
     a4->grad->print();
 
@@ -145,7 +79,7 @@ int main() {
     auto a8 = a6+a7;
     a8->print();
     a8->grad = make_shared<Tensor>(vector<int>{1, 1, 2, 3}, vector<float>{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}, true);
-    a8->backward_fn();
+    a8->backward();
     a6->grad->print();
     a7->grad->print();
 } 
@@ -154,22 +88,30 @@ int main() {
 
 
 
+// Tensor(2, 1, 3):
 // [[1 , 100 , 1000 ]], [[750 , 500 , 5000 ]]
 // Tensor(2, 4, 3):
 // [[1 , 2 , 3 ], [4 , 5 , 6 ], [7 , 8 , 9 ], [10 , 11 , 12 ]], [[13 , 14 , 15 ], [16 , 17 , 18 ], [19 , 20 , 21 ], [22 , 23 , 24 ]]
-// hi
 // Tensor(2, 4, 3):
 // [[2 , 102 , 1003 ], [5 , 105 , 1006 ], [8 , 108 , 1009 ], [11 , 111 , 1012 ]], [[763 , 514 , 5015 ], [766 , 517 , 5018 ], [769 , 520 , 5021 ], [772 , 523 , 5024 ]]
 // Tensor(2, 3, 3):
 // [[101 , 102 , 103 ], [201 , 202 , 203 ], [301 , 302 , 303 ]], [[104 , 105 , 106 ], [204 , 205 , 206 ], [304 , 305 , 306 ]]
 // Tensor(2, 3, 3):
 // [[1000 , 2000 , 3000 ], [4000 , 5000 , 6000 ], [7000 , 8000 , 9000 ]], [[10000 , 11000 , 12000 ], [13000 , 14000 , 15000 ], [16000 , 17000 , 18000 ]]
+// q size: 1
+// Backward +
+// Backward broadcast
+// Backward broadcast
 // Tensor(2, 1, 3):
-// [[12000 , 15000 , 18000 ]], [[21000 , 24000 , 27000 ]]
+// [[12000 , 15000 , 18000 ]], [[39000 , 42000 , 45000 ]]
 // Tensor(3, 1):
-// [39000 ], [45000 ], [51000 ]
+// [39000 ], [57000 ], [75000 ]
 // Tensor(1, 1, 2, 3):
 // [[[2 , 3 , 4 ], [5 , 6 , 7 ]]]
+// q size: 1
+// Backward +
+// Backward broadcast
+// Backward broadcast
 // Tensor(1, 1, 1, 1):
 // [[[6 ]]]
 // Tensor(2, 3):

@@ -32,6 +32,7 @@ class Tensor : public enable_shared_from_this<Tensor> {
         shared_ptr<Tensor> reduce_to_shape(const vector<int>& target_shape);
         shared_ptr<Tensor> sum(int axis, bool keepdims=false);
         shared_ptr<Tensor> transpose(int dim1, int dim2);
+        void backward();
         void print();
 
         // Broadcasting and reduction operations
@@ -50,8 +51,10 @@ class Tensor : public enable_shared_from_this<Tensor> {
 // // Free function declarations
 shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor>& operator+=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor>& operator-=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+shared_ptr<Tensor>& operator*=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);
