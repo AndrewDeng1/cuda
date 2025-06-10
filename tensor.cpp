@@ -479,6 +479,40 @@ shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     return result;
 }
 
+shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+    if(!is_broadcastable(A->shape, B->shape, false)){
+        throw invalid_argument("Shape mismatch");
+    }
+
+    vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
+
+    shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
+    shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
+    
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
+
+    for(int i=0; i<new_A->size(); i++){
+        result->at(i) = new_A->at(i) / new_B->at(i);
+    }
+
+    if(new_A->requires_grad || new_B->requires_grad){
+        result->parents.push_back(new_A);
+        result->parents.push_back(new_B);
+        
+        result->backward_fn = [new_A, new_B, result](){
+            // printf("Backward /\n");
+            if(new_A->requires_grad){
+                new_A->grad += result->grad/new_B;
+            }
+            if(new_B->requires_grad){
+                new_B->grad += result->grad*(-new_A/(new_B*new_B));
+            }
+        };
+    }
+
+    return result;
+}
+    
 shared_ptr<Tensor>& operator+=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
 
     // Manages memory and references carefully
@@ -496,6 +530,47 @@ shared_ptr<Tensor>& operator-=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& 
 shared_ptr<Tensor>& operator*=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
     A = A * B;
     return A;
+}
+
+shared_ptr<Tensor>& operator/=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+    A = A / B;
+    return A;
+}
+
+shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, float B) {
+    return A + make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+}
+
+shared_ptr<Tensor> operator+(float A, const shared_ptr<Tensor>& B) {
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) + B;
+}
+
+shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, float B) {
+    return A - make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+}
+
+shared_ptr<Tensor> operator-(float A, const shared_ptr<Tensor>& B) {
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) - B;
+}
+
+shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, float B) {
+    return A * make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+}
+
+shared_ptr<Tensor> operator*(float A, const shared_ptr<Tensor>& B) {
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) * B;
+}
+
+shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, float B) {
+    return A / make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+}
+
+shared_ptr<Tensor> operator/(float A, const shared_ptr<Tensor>& B) {
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) / B;
+}
+
+shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A) {
+    return -1.0f * A;
 }
 
 shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {

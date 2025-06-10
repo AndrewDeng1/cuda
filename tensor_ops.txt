@@ -1,7 +1,7 @@
 None,
 - Add,
 - Sub,
-Mul,
+- Mul,
 Dot,
 - Transpose,
 - Reshape,

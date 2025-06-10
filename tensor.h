@@ -52,9 +52,22 @@ class Tensor : public enable_shared_from_this<Tensor> {
 shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor>& operator+=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor>& operator-=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor>& operator*=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+shared_ptr<Tensor>& operator/=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+
+// Scalar-tensor operators
+shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, float B);
+shared_ptr<Tensor> operator+(float A, const shared_ptr<Tensor>& B);
+shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, float B);
+shared_ptr<Tensor> operator-(float A, const shared_ptr<Tensor>& B);
+shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A);
+shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, float B);
+shared_ptr<Tensor> operator*(float A, const shared_ptr<Tensor>& B);
+shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, float B);
+shared_ptr<Tensor> operator/(float A, const shared_ptr<Tensor>& B);
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);
