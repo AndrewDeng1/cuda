@@ -69,6 +69,8 @@ shared_ptr<Tensor> operator*(float A, const shared_ptr<Tensor>& B);
 shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, float B);
 shared_ptr<Tensor> operator/(float A, const shared_ptr<Tensor>& B);
 
+shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);
 vector<int> get_broadcast_shape(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);

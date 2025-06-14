@@ -234,6 +234,15 @@ shared_ptr<Tensor> Tensor::sum(int axis, bool keepdims) {
 }
 
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul) {
+    
+    if(matmul && (A_shape.size()<2 || B_shape.size()<2)){
+        return false;
+    }
+
+    if(matmul && A_shape[A_shape.size()-1]!=B_shape[B_shape.size()-2]){
+        return false;
+    }
+    
     int d = max(A_shape.size(), B_shape.size());
     for(int i = 0; i < d-2*matmul; i++) {
         int dim_A = (i < d-A_shape.size()) ? 1 : A_shape[i-(d-A_shape.size())];
@@ -245,6 +254,7 @@ bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bo
             return false;
         }
     }
+
     return true;
 }
 
@@ -257,6 +267,7 @@ vector<int> get_broadcast_shape(const vector<int>& A_shape, const vector<int>& B
 
     vector<int> new_shape;
     int d = max(A_shape.size(), B_shape.size());
+
     for(int i=0; i<d-2*matmul; i++){
         if(i<d-A_shape.size()){
             new_shape.push_back(B_shape[i]);
@@ -279,6 +290,7 @@ vector<int> get_broadcast_shape(const vector<int>& A_shape, const vector<int>& B
 }
 
 shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) {
+    // Checks matmul compatibility
     if(!is_broadcastable(shape, new_shape, matmul)) {
         throw std::runtime_error("Broadcast shape mismatch");
     }
@@ -573,6 +585,98 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A) {
     return -1.0f * A;
 }
 
+shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+    
+    // is_broadcast should alr check this, but check anyways
+    if(A->shape.size()<2 || B->shape.size()<2){
+        throw invalid_argument("Tensor must have at least 2 dimensions");
+    }
+
+    if(A->shape[A->shape.size()-1]!=B->shape[B->shape.size()-2]){
+        throw invalid_argument("Shape mismatch");
+    }
+
+    if(!is_broadcastable(A->shape, B->shape, true)){
+        throw invalid_argument("Shape mismatch");
+    }
+
+    vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, true);
+
+    vector<int> new_shape_A(new_shape);
+    new_shape_A.push_back(A->shape[A->shape.size()-2]);
+    new_shape_A.push_back(A->shape[A->shape.size()-1]);
+    vector<int> new_shape_B(new_shape);
+    new_shape_B.push_back(B->shape[B->shape.size()-2]);
+    new_shape_B.push_back(B->shape[B->shape.size()-1]);
+
+    shared_ptr<Tensor> new_A = A->broadcast(new_shape_A);
+    shared_ptr<Tensor> new_B = B->broadcast(new_shape_B);
+    vector<int> matmul_output_shape;
+    for(int i=0; i<new_shape.size(); i++){
+        matmul_output_shape.push_back(new_shape[i]);
+    }
+    matmul_output_shape.push_back(new_shape_A[new_shape_A.size()-2]);
+    matmul_output_shape.push_back(new_shape_B[new_shape_B.size()-1]);
+
+    shared_ptr<Tensor> result = make_shared<Tensor>(matmul_output_shape, A->requires_grad||B->requires_grad);
+    for(int i=0; i<result->size(); i++){
+        int ind_A = 0;
+        int ind_B = 0;
+        int curr_A = i;
+        int curr_B = i;
+
+        // Gets you to dimension before 2D
+        for(int j=0; j<new_shape_A.size()-2; j++){
+            ind_A += (curr_A/result->strides[j])*new_A->strides[j];
+            curr_A%=result->strides[j];
+        }
+
+        // Get corresponding row
+        ind_A += (curr_A/result->strides[result->strides.size()-2])*new_A->strides[new_A->strides.size()-2];
+        
+        // Ignore column
+        curr_A%=result->strides[result->strides.size()-1];
+        
+        // Gets you to dimension before 2D
+        for(int j=0; j<new_shape_B.size()-2; j++){
+            ind_B += (curr_B/result->strides[j])*new_B->strides[j];
+            curr_B%=result->strides[j];
+        }
+
+        // Ignore row
+        curr_B%=result->strides[result->strides.size()-2];
+        
+        // Get corresponding column
+        ind_B += (curr_B/result->strides[result->strides.size()-1])*new_B->strides[new_B->strides.size()-1];
+        
+        for(int j=0; j<new_shape_A[new_shape_A.size()-1]; j++){
+            result->at(i) += new_A->at(ind_A)*new_B->at(ind_B);
+            ind_A += new_A->strides[new_A->strides.size()-1];
+            ind_B += new_B->strides[new_B->strides.size()-2];
+        }
+    }
+    if(new_A->requires_grad || new_B->requires_grad){
+        result->parents.push_back(new_A);
+        result->parents.push_back(new_B);
+        
+        result->backward_fn = [new_A, new_B, result]() {
+            // printf("Backward matmul\n");
+            if(new_A->requires_grad) {
+                // dA = dC * B^T
+                auto B_transposed = new_B->transpose(new_B->shape.size()-2, new_B->shape.size()-1);
+                new_A->grad += matmul(result->grad, B_transposed);
+            }
+            if(new_B->requires_grad) {
+                // dB = A^T * dC
+                auto A_transposed = new_A->transpose(new_A->shape.size()-2, new_A->shape.size()-1);
+                new_B->grad += matmul(A_transposed, result->grad);
+            }
+        };
+    }
+
+    return result;
+}
+
 shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
     
     // Must be at least 2 dimensions for transpose
@@ -605,6 +709,27 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
     swap(new_shape[dim1], new_shape[dim2]);
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad);
+
+    for(int i=0; i<result->size(); i++){
+        int ind=0;
+        int curr=i;
+        int mag_dim1;
+        int mag_dim2;
+        for(int j=0; j<new_shape.size(); j++){
+            if(j==dim1){
+                mag_dim1=curr/result->strides[j];
+            } else if(j==dim2){
+                mag_dim2=curr/result->strides[j];
+            }
+            ind+=(curr/result->strides[j])*strides[j];
+            curr%=result->strides[j];
+        }
+        ind-=mag_dim1*strides[dim1];
+        ind+=mag_dim2*strides[dim1];
+        ind+=mag_dim1*strides[dim2];
+        ind-=mag_dim2*strides[dim2];
+        result->at(i)=at(ind);
+    }
 
     if(requires_grad){
         result->parents.push_back(shared_from_this());
