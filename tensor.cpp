@@ -585,6 +585,148 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A) {
     return -1.0f * A;
 }
 
+// // Comparison operators
+// shared_ptr<Tensor> operator>(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+//     if(!is_broadcastable(A->shape, B->shape, false)){
+//         throw invalid_argument("Shape mismatch");
+//     }
+
+//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
+
+//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
+//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
+    
+//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
+
+//     for(int i=0; i<new_A->size(); i++){
+//         result->at(i) = new_A->at(i) > new_B->at(i) ? 1.0f : 0.0f;
+//     }
+
+//     if(new_A->requires_grad || new_B->requires_grad){
+//         result->parents.push_back(new_A);
+//         result->parents.push_back(new_B);
+//         result->backward_fn = [](){
+//             throw runtime_error("Backward function for comparison operator '>' should not be called directly");
+//         };
+//     }
+
+//     return result;
+// }
+
+// shared_ptr<Tensor> operator<(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+//     if(!is_broadcastable(A->shape, B->shape, false)){
+//         throw invalid_argument("Shape mismatch");
+//     }
+
+//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
+
+//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
+//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
+    
+//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
+
+//     for(int i=0; i<new_A->size(); i++){
+//         result->at(i) = new_A->at(i) < new_B->at(i) ? 1.0f : 0.0f;
+//     }
+
+//     if(new_A->requires_grad || new_B->requires_grad){
+//         result->parents.push_back(new_A);
+//         result->parents.push_back(new_B);
+//         result->backward_fn = [](){
+//             throw runtime_error("Backward function for comparison operator '<' should not be called directly");
+//         };
+//     }
+
+//     return result;
+// }
+
+// shared_ptr<Tensor> operator>=(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+//     if(!is_broadcastable(A->shape, B->shape, false)){
+//         throw invalid_argument("Shape mismatch");
+//     }
+
+//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
+
+//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
+//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
+    
+//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
+
+//     for(int i=0; i<new_A->size(); i++){
+//         result->at(i) = new_A->at(i) >= new_B->at(i) ? 1.0f : 0.0f;
+//     }
+
+//     if(new_A->requires_grad || new_B->requires_grad){
+//         result->parents.push_back(new_A);
+//         result->parents.push_back(new_B);
+//         result->backward_fn = [](){
+//             throw runtime_error("Backward function for comparison operator '>=' should not be called directly");
+//         };
+//     }
+
+//     return result;
+// }
+
+// shared_ptr<Tensor> operator<=(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
+//     if(!is_broadcastable(A->shape, B->shape, false)){
+//         throw invalid_argument("Shape mismatch");
+//     }
+
+//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
+
+//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
+//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
+    
+//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
+
+//     for(int i=0; i<new_A->size(); i++){
+//         result->at(i) = new_A->at(i) <= new_B->at(i) ? 1.0f : 0.0f;
+//     }
+
+//     if(new_A->requires_grad || new_B->requires_grad){
+//         result->parents.push_back(new_A);
+//         result->parents.push_back(new_B);
+//         result->backward_fn = [](){
+//             throw runtime_error("Backward function for comparison operator '<=' should not be called directly");
+//         };
+//     }
+
+//     return result;
+// }
+
+// // Scalar comparison operators
+// shared_ptr<Tensor> operator>(const shared_ptr<Tensor>& A, float B) {
+//     return A > make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
+// }
+
+// shared_ptr<Tensor> operator>(float A, const shared_ptr<Tensor>& B) {
+//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) > B;
+// }
+
+// shared_ptr<Tensor> operator<(const shared_ptr<Tensor>& A, float B) {
+//     return A < make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
+// }
+
+// shared_ptr<Tensor> operator<(float A, const shared_ptr<Tensor>& B) {
+//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) < B;
+// }
+
+// shared_ptr<Tensor> operator>=(const shared_ptr<Tensor>& A, float B) {
+//     return A >= make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
+// }
+
+// shared_ptr<Tensor> operator>=(float A, const shared_ptr<Tensor>& B) {
+//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) >= B;
+// }
+
+// shared_ptr<Tensor> operator<=(const shared_ptr<Tensor>& A, float B) {
+//     return A <= make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
+// }
+
+// shared_ptr<Tensor> operator<=(float A, const shared_ptr<Tensor>& B) {
+//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) <= B;
+// }
+
 shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
     
     // is_broadcast should alr check this, but check anyways
@@ -742,7 +884,54 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
 
     return result;
 }
-    
+
+shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A) {
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    for(int i=0; i<result->size(); i++){
+        result->at(i) = std::max(0.0f, A->at(i));
+    }
+    if(A->requires_grad){
+        result->parents.push_back(A);
+        result->backward_fn = [A, result](){
+            // For ReLU, we need to compute the gradient mask without using comparison operators
+            // since they don't have backward functions
+            auto grad_mask = make_shared<Tensor>(result->shape, false);
+            for(int i=0; i<result->size(); i++) {
+                grad_mask->at(i) = result->at(i) > 0.0f ? 1.0f : 0.0f;
+            }
+            A->grad += result->grad * grad_mask;
+        };
+    }
+    return result;
+}
+
+shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A) {
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    for(int i=0; i<result->size(); i++){
+        result->at(i) = 1.0f/(1.0f+exp(-A->at(i)));
+    }
+    if(A->requires_grad){
+        result->parents.push_back(A);
+        result->backward_fn = [A, result](){
+            A->grad += result->grad*result*(1.0f-result);
+        };
+    }
+    return result;
+}
+
+shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    for(int i=0; i<result->size(); i++){
+        result->at(i) = (exp(A->at(i)) - exp(-A->at(i))) / (exp(A->at(i)) + exp(-A->at(i)));
+    }
+    if(A->requires_grad){
+        result->parents.push_back(A);
+        result->backward_fn = [A, result](){
+            A->grad += result->grad*(1.0f-result*result);
+        };
+    }
+    return result;
+}
 
 void Tensor::print() {
     // Helper function to print a single value with proper formatting

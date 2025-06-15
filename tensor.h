@@ -71,6 +71,10 @@ shared_ptr<Tensor> operator/(float A, const shared_ptr<Tensor>& B);
 
 shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
 
+shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A);
+shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A);
+shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A);
+
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);
 vector<int> get_broadcast_shape(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);
