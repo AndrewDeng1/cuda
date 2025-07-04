@@ -38,6 +38,12 @@ Tensor::Tensor(const vector<int>& shape, float* data, bool requires_grad) : Tens
     }
 }
 
+Tensor::Tensor(const vector<int>& shape, float num, bool requires_grad) : Tensor(shape, requires_grad) {
+    for(int i=0; i<size(); i++){
+        this->data[i] = num;
+    }
+}
+
 Tensor::Tensor(shared_ptr<Tensor> other) : Tensor(other->shape, other->data, other->requires_grad) {
 
     // if(requires_grad){
@@ -885,6 +891,36 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
     return result;
 }
 
+shared_ptr<Tensor> Tensor::pow(float exponent) {
+    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+    for(int i=0; i<result->size(); i++){
+        result->at(i) = std::pow(at(i), exponent);
+    }
+    if(requires_grad){
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [exponent, result, this](){
+            this->grad += result->grad*exponent*pow(exponent-1.0f);
+        };
+    }
+    return result;
+}
+
+shared_ptr<Tensor> Tensor::mean(int axis, bool keepdims) {
+    int N = shape[axis];
+    return sum(axis, keepdims)/N;
+}
+
+shared_ptr<Tensor> Tensor::variance_squared(int axis, bool keepdims) {
+    shared_ptr<Tensor> centered = shared_from_this()-mean(axis, keepdims)->broadcast(shape, false);
+    shared_ptr<Tensor> centered_squared = centered*centered;
+    return centered_squared->mean(axis, keepdims);
+}
+
+shared_ptr<Tensor> Tensor::norm(int axis, bool keepdims) {
+    shared_ptr<Tensor> epsilon = make_shared<Tensor>(shape, 1e-5f, false);
+    return (shared_from_this()-mean(axis, keepdims)->broadcast(shape, false))/(variance_squared(axis, keepdims)+epsilon)->pow(0.5f);
+}
+
 shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A) {
     shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
     for(int i=0; i<result->size(); i++){
@@ -932,6 +968,63 @@ shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
     }
     return result;
 }
+
+// shared_ptr<Tensor> Tensor::softmax(int axis, bool keepdims) {
+//     vector<int> new_shape;
+//     for(int i=0; i<shape.size(); i++){
+//         if(i==axis){
+//             if(keepdims){
+//                 new_shape.push_back(1);
+//             }
+//         } else {
+//             new_shape.push_back(shape[i]);
+//         }
+//     }
+
+//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+
+//     for(int i=0; i<result->size(); i++){
+//         double sm=0.0;
+//         for(int j=0; j<shape[axis]; j++){
+
+//             int curr=i;
+//             int idx=0;
+//             for(int x=0; x<shape.size(); x++){
+//                 if(x==axis){
+//                     idx+=j*strides[x];
+//                 } else {
+//                     idx+=(curr/result->strides[x])*strides[x];
+//                 }
+//                 curr%=result->strides[x];
+//             }
+
+//             sm+=exp(at(idx));
+//         }
+//         result->at(i)=exp(at(i))/sm;
+//     }
+
+//     if(requires_grad){
+//         result->parents.push_back(shared_from_this());
+//         result->backward_fn = [this, result, axis]() {
+//             // printf("Backward sum\n");
+//             this->grad = this->grad + result->grad->broadcast(shape);
+//             for(int i=0; i<result->size(); i++){
+//                 int curr=i;
+//                 int idx=0;
+//                 for(int x=0; x<shape.size(); x++){
+//                     if(x==axis){
+//                         idx+=j*strides[x];
+//                     } else {
+//                         idx+=(curr/result->strides[x])*strides[x];
+//                     }
+//                     curr%=result->strides[x];
+//                 }
+//             }
+//         };
+//     }
+
+//     return result;
+// }
 
 void Tensor::print() {
     // Helper function to print a single value with proper formatting

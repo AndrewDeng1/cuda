@@ -20,6 +20,7 @@ class Tensor : public enable_shared_from_this<Tensor> {
         Tensor(const vector<int>& shape, bool requires_grad=false);
         Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad=false);
         Tensor(const vector<int>& shape, float* data, bool requires_grad=false);
+        Tensor(const vector<int>& shape, float num, bool requires_grad=false);
         Tensor(shared_ptr<Tensor> other);
 
         // // Member functions
@@ -32,6 +33,10 @@ class Tensor : public enable_shared_from_this<Tensor> {
         shared_ptr<Tensor> reduce_to_shape(const vector<int>& target_shape);
         shared_ptr<Tensor> sum(int axis, bool keepdims=false);
         shared_ptr<Tensor> transpose(int dim1, int dim2);
+        shared_ptr<Tensor> mean(int axis, bool keepdims=false);
+        shared_ptr<Tensor> variance_squared(int axis, bool keepdims=false);
+        shared_ptr<Tensor> norm(int axis, bool keepdims=false);
+        shared_ptr<Tensor> pow(float exponent);
         void backward();
         void print();
 
