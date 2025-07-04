@@ -31,12 +31,13 @@ class Tensor : public enable_shared_from_this<Tensor> {
         vector<int> compute_strides(const vector<int>& shape);
         shared_ptr<Tensor> reshape(const vector<int>& new_shape);
         shared_ptr<Tensor> reduce_to_shape(const vector<int>& target_shape);
-        shared_ptr<Tensor> sum(int axis, bool keepdims=false);
+        shared_ptr<Tensor> sum(int axis, bool keepdims=true);
         shared_ptr<Tensor> transpose(int dim1, int dim2);
-        shared_ptr<Tensor> mean(int axis, bool keepdims=false);
-        shared_ptr<Tensor> variance_squared(int axis, bool keepdims=false);
-        shared_ptr<Tensor> norm(int axis, bool keepdims=false);
+        shared_ptr<Tensor> mean(int axis, bool keepdims=true);
+        shared_ptr<Tensor> variance_squared(int axis, bool keepdims=true);
+        shared_ptr<Tensor> norm(int axis, bool keepdims=true);
         shared_ptr<Tensor> pow(float exponent);
+        shared_ptr<Tensor> softmax(int axis, bool keepdims=true);
         void backward();
         void print();
 

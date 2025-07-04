@@ -969,62 +969,76 @@ shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
     return result;
 }
 
-// shared_ptr<Tensor> Tensor::softmax(int axis, bool keepdims) {
-//     vector<int> new_shape;
-//     for(int i=0; i<shape.size(); i++){
-//         if(i==axis){
-//             if(keepdims){
-//                 new_shape.push_back(1);
-//             }
-//         } else {
-//             new_shape.push_back(shape[i]);
-//         }
-//     }
+shared_ptr<Tensor> Tensor::softmax(int axis, bool keepdims) {
+    // Softmax should return the same shape as input
+    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
 
-//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+    // For each position in the result tensor
+    for(int i=0; i<result->size(); i++){
+        // Convert linear index to multi-dimensional indices
+        int curr = i;
+        vector<int> indices(shape.size());
+        for(int x=shape.size()-1; x>=0; x--){
+            indices[x] = curr % shape[x];
+            curr /= shape[x];
+        }
+        
+        // Find the maximum value along the axis for numerical stability
+        double max_val = at(i);
+        for(int j=0; j<shape[axis]; j++){
+            // Create indices for the current element along the axis
+            vector<int> max_indices = indices;
+            max_indices[axis] = j;
+            
+            // Convert back to linear index
+            int max_idx = 0;
+            for(int x=0; x<shape.size(); x++){
+                max_idx += max_indices[x] * strides[x];
+            }
+            
+            max_val = std::max(max_val, (double)at(max_idx));
+        }
+        
+        // Calculate the sum of exp(x - max_val) for all elements along the specified axis
+        double sum_exp = 0.0;
+        for(int j=0; j<shape[axis]; j++){
+            // Create indices for the current element along the axis
+            vector<int> sum_indices = indices;
+            sum_indices[axis] = j;
+            
+            // Convert back to linear index
+            int sum_idx = 0;
+            for(int x=0; x<shape.size(); x++){
+                sum_idx += sum_indices[x] * strides[x];
+            }
+            
+            sum_exp += exp(at(sum_idx) - max_val);
+        }
+        
+        // Set the result: exp(x - max_val) / sum(exp(x - max_val))
+        result->at(i) = exp(at(i) - max_val) / sum_exp;
+    }
 
-//     for(int i=0; i<result->size(); i++){
-//         double sm=0.0;
-//         for(int j=0; j<shape[axis]; j++){
+    if(requires_grad){
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [this, result, axis]() {
+            // printf("Backward softmax\n");
+            // For softmax, the gradient is: grad_input = softmax * (grad_output - sum(grad_output * softmax))
+            
+            // Compute the sum of grad_output * softmax along the axis
+            auto grad_softmax_product = result->grad * result;
+            auto grad_sum = grad_softmax_product->sum(axis, true);
+            
+            // Compute the gradient: softmax * (grad_output - sum)
+            auto grad_diff = result->grad - grad_sum->broadcast(shape, false);
+            auto final_grad = result * grad_diff;
+            
+            this->grad = this->grad + final_grad;
+        };
+    }
 
-//             int curr=i;
-//             int idx=0;
-//             for(int x=0; x<shape.size(); x++){
-//                 if(x==axis){
-//                     idx+=j*strides[x];
-//                 } else {
-//                     idx+=(curr/result->strides[x])*strides[x];
-//                 }
-//                 curr%=result->strides[x];
-//             }
-
-//             sm+=exp(at(idx));
-//         }
-//         result->at(i)=exp(at(i))/sm;
-//     }
-
-//     if(requires_grad){
-//         result->parents.push_back(shared_from_this());
-//         result->backward_fn = [this, result, axis]() {
-//             // printf("Backward sum\n");
-//             this->grad = this->grad + result->grad->broadcast(shape);
-//             for(int i=0; i<result->size(); i++){
-//                 int curr=i;
-//                 int idx=0;
-//                 for(int x=0; x<shape.size(); x++){
-//                     if(x==axis){
-//                         idx+=j*strides[x];
-//                     } else {
-//                         idx+=(curr/result->strides[x])*strides[x];
-//                     }
-//                     curr%=result->strides[x];
-//                 }
-//             }
-//         };
-//     }
-
-//     return result;
-// }
+    return result;
+}
 
 void Tensor::print() {
     // Helper function to print a single value with proper formatting

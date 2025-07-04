@@ -117,3 +117,41 @@ int main() {
 
     return 0;
 }
+
+
+
+// SOFTMAX TEST - Input tensor:
+// Tensor(2, 3):
+// [1 , 2 , 3 ], [4 , 5 , 6 ]
+// SOFTMAX along axis 1 (softmax of each row):
+// Tensor(2, 3):
+// [0.0900306 , 0.244728 , 0.665241 ], [0.0900306 , 0.244728 , 0.665241 ]
+// Gradients for SOFTMAX along axis 1:
+// Tensor(2, 3):
+// [0.0819251 , -0.022033, -0.059892], [-0.022033, 0.184836 , -0.162803]
+// SOFTMAX along axis 0 (softmax of each column):
+// Tensor(2, 3):
+// [0.0474259 , 0.0474259 , 0.0474259 ], [0.952574 , 0.952574 , 0.952574 ]
+// Gradients for SOFTMAX along axis 0:
+// Tensor(2, 3):
+// [0.127102 , -0.022033, -0.105069], [-0.0672097, 0.184836 , -0.117627]
+
+// Second SOFTMAX test - Input tensor with negative values:
+// Tensor(2, 2):
+// [-2, 2 ], [-1, 1 ]
+// SOFTMAX along axis 1 (with negative values):
+// Tensor(2, 2):
+// [0.0179862 , 0.982014 ], [0.119203 , 0.880797 ]
+// Gradients for SOFTMAX with negative values:
+// Tensor(2, 2):
+// [0.0176627 , -0.0176627], [-0.104994, 0.104994 ]
+
+// Third SOFTMAX test - Input tensor with large values:
+// Tensor(1, 3):
+// [100 , 101 , 102 ]
+// SOFTMAX with large values (should be numerically stable):
+// Tensor(1, 3):
+// [0.0900306 , 0.244728 , 0.665241 ]
+// Gradients for SOFTMAX with large values:
+// Tensor(1, 3):
+// [0.0819251 , -0.022033, -0.059892]

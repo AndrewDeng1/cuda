@@ -13,6 +13,6 @@ None,
 LogSoftmax,
 NegativeLogLikelihood,
 - LayerNorm,
-Softmax,
+- Softmax,
 Dropout,
 EmbeddingLookup

@@ -209,3 +209,79 @@ int main() {
 
     return 0;
 }
+
+
+
+// POW TEST - Input tensor:
+// Tensor(2, 3):
+// [2 , 3 , 4 ], [5 , 6 , 7 ]
+// POW(2) - Squaring each element:
+// Tensor(2, 3):
+// [4 , 9 , 16 ], [25 , 36 , 49 ]
+// Gradients for POW(2):
+// Tensor(2, 3):
+// [4 , 6 , 8 ], [10 , 12 , 14 ]
+// POW(0.5) - Square root of each element:
+// Tensor(2, 3):
+// [1.41421 , 1.73205 , 2 ], [2.23607 , 2.44949 , 2.64575 ]
+
+// ==================================================
+
+// MEAN TEST - Input tensor:
+// Tensor(2, 3):
+// [1 , 2 , 3 ], [4 , 5 , 6 ]
+// MEAN along axis 1 (mean of each row):
+// Tensor(2, 1):
+// [2 ], [5 ]
+// Gradients for MEAN along axis 1:
+// Tensor(2, 3):
+// [0.333333 , 0.333333 , 0.333333 ], [0.333333 , 0.333333 , 0.333333 ]
+// MEAN along axis 0 (mean of each column):
+// Tensor(1, 3):
+// [2.5 , 3.5 , 4.5 ]
+// Gradients for MEAN along axis 0:
+// Tensor(2, 3):
+// [0.833333 , 0.833333 , 0.833333 ], [0.833333 , 0.833333 , 0.833333 ]
+
+// ==================================================
+
+// VARIANCE SQUARED TEST - Input tensor:
+// Tensor(2, 3):
+// [1 , 2 , 3 ], [4 , 5 , 6 ]
+// VARIANCE SQUARED along axis 1 (variance of each row):
+// Tensor(2, 1):
+// [0.666667 ], [0.666667 ]
+// Gradients for VARIANCE SQUARED along axis 1:
+// Tensor(2, 3):
+// [-0.666667, 0 , 0.666667 ], [-0.666667, 0 , 0.666667 ]
+// VARIANCE SQUARED along axis 0 (variance of each column):
+// Tensor(1, 3):
+// [2.25 , 2.25 , 2.25 ]
+// Gradients for VARIANCE SQUARED along axis 0:
+// Tensor(2, 3):
+// [-2.16667, -1.5, -0.833333], [0.833333 , 1.5 , 2.16667 ]
+
+// ==================================================
+
+// Input tensor:
+// Tensor(2, 3):
+// [1 , 2 , 3 ], [4 , 5 , 6 ]
+// Layer norm along axis 1 (normalize each row):
+// Tensor(2, 3):
+// [-1.22474, 0 , 1.22474 ], [-1.22474, 0 , 1.22474 ]
+// Gradients for layer norm along axis 1:
+// Tensor(2, 3):
+// [2.44947 , 2.44947 , 2.44947 ], [2.44947 , 2.44947 , 2.44947 ]
+// Layer norm along axis 0 (normalize each column):
+// Tensor(2, 3):
+// [-0.999998, -0.999998, -0.999998], [0.999998 , 0.999998 , 0.999998 ]
+// Gradients for layer norm along axis 0:
+// Tensor(2, 3):
+// [3.7828 , 3.7828 , 3.7828 ], [3.7828 , 3.7828 , 3.7828 ]
+
+// Second test - Input tensor:
+// Tensor(2, 2):
+// [10 , 20 ], [30 , 40 ]
+// Layer norm along axis 1:
+// Tensor(2, 2):
+// [-1, 1 ], [-1, 1 ]
