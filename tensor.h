@@ -37,7 +37,10 @@ class Tensor : public enable_shared_from_this<Tensor> {
         shared_ptr<Tensor> variance_squared(int axis, bool keepdims=true);
         shared_ptr<Tensor> norm(int axis, bool keepdims=true);
         shared_ptr<Tensor> pow(float exponent);
-        shared_ptr<Tensor> softmax(int axis, bool keepdims=true);
+        shared_ptr<Tensor> softmax(int axis);
+        // shared_ptr<Tensor> log_softmax(int axis, bool keepdims=true);
+        // shared_ptr<Tensor> negative_log_likelihood(const shared_ptr<Tensor>& y_true);
+        shared_ptr<Tensor> cross_entropy(const shared_ptr<Tensor>& y_true, int axis, bool keepdims=true);
         void backward();
         void print();
 

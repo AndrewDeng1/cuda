@@ -1,4 +1,5 @@
 #include "tensor.h"
+#include "tensor_kernels.h"
 
 Tensor::Tensor() : data(nullptr), grad(nullptr), parents(), backward_fn() {}
 
@@ -406,9 +407,12 @@ shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
 
-    for(int i=0; i<new_A->size(); i++){
-        result->at(i) = new_A->at(i) + new_B->at(i);
-    }
+    // CPU:
+    // for(int i=0; i<new_A->size(); i++){
+    //     result->at(i) = new_A->at(i) + new_B->at(i);
+    // }
+
+    launchAdd(new_A->data, new_B->data, result->data, result->size());
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -969,55 +973,101 @@ shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
     return result;
 }
 
-shared_ptr<Tensor> Tensor::softmax(int axis, bool keepdims) {
+// SOFTMAX
+shared_ptr<Tensor> Tensor::softmax(int axis) {
+    if(axis<0){
+        axis+=shape.size();
+    }
+    if(axis>=shape.size()||axis<0){
+        throw std::runtime_error("Invalid axis");
+    }
+
+    // Equivalent of sum along axis with keepdims=true, but sum of exp(at(i))
+    vector<int> sm_exp_shape;
+    for(int i=0; i<shape.size(); i++){
+        if(i==axis){
+            sm_exp_shape.push_back(1);
+        } else {
+            sm_exp_shape.push_back(shape[i]);
+        }
+    }
+
+    shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, requires_grad);
+
+    for(int i=0; i<sm_exp->size(); i++){
+        for(int j=0; j<shape[axis]; j++){
+
+            int curr=i;
+            int idx=0;
+            for(int x=0; x<shape.size(); x++){
+                if(x==axis){
+                    idx+=j*strides[x];
+                } else {
+                    idx+=(curr/sm_exp->strides[x])*strides[x];
+                }
+                curr%=sm_exp->strides[x];
+            }
+
+            sm_exp->at(i)+=exp(at(idx));
+        }
+    }
+
+    shared_ptr<Tensor> sm_exp_broadcast = sm_exp->broadcast(shape, false);
+
     // Softmax should return the same shape as input
     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
 
-    // For each position in the result tensor
     for(int i=0; i<result->size(); i++){
-        // Convert linear index to multi-dimensional indices
-        int curr = i;
-        vector<int> indices(shape.size());
-        for(int x=shape.size()-1; x>=0; x--){
-            indices[x] = curr % shape[x];
-            curr /= shape[x];
-        }
-        
-        // Find the maximum value along the axis for numerical stability
-        double max_val = at(i);
-        for(int j=0; j<shape[axis]; j++){
-            // Create indices for the current element along the axis
-            vector<int> max_indices = indices;
-            max_indices[axis] = j;
-            
-            // Convert back to linear index
-            int max_idx = 0;
-            for(int x=0; x<shape.size(); x++){
-                max_idx += max_indices[x] * strides[x];
-            }
-            
-            max_val = std::max(max_val, (double)at(max_idx));
-        }
-        
-        // Calculate the sum of exp(x - max_val) for all elements along the specified axis
-        double sum_exp = 0.0;
-        for(int j=0; j<shape[axis]; j++){
-            // Create indices for the current element along the axis
-            vector<int> sum_indices = indices;
-            sum_indices[axis] = j;
-            
-            // Convert back to linear index
-            int sum_idx = 0;
-            for(int x=0; x<shape.size(); x++){
-                sum_idx += sum_indices[x] * strides[x];
-            }
-            
-            sum_exp += exp(at(sum_idx) - max_val);
-        }
-        
-        // Set the result: exp(x - max_val) / sum(exp(x - max_val))
-        result->at(i) = exp(at(i) - max_val) / sum_exp;
+        result->at(i)=exp(at(i))/sm_exp_broadcast->at(i);
     }
+
+
+    // // For each position in the result tensor
+    // for(int i=0; i<result->size(); i++){
+
+    //     // Convert linear index to multi-dimensional indices
+    //     int curr = i;
+    //     vector<int> indices(shape.size());
+    //     for(int x=shape.size()-1; x>=0; x--){
+    //         indices[x] = curr % shape[x];
+    //         curr /= shape[x];
+    //     }
+        
+    //     // Find the maximum value along the axis for numerical stability
+    //     double max_val = at(i);
+    //     for(int j=0; j<shape[axis]; j++){
+    //         // Create indices for the current element along the axis
+    //         vector<int> max_indices = indices;
+    //         max_indices[axis] = j;
+            
+    //         // Convert back to linear index
+    //         int max_idx = 0;
+    //         for(int x=0; x<shape.size(); x++){
+    //             max_idx += max_indices[x] * strides[x];
+    //         }
+            
+    //         max_val = std::max(max_val, (double)at(max_idx));
+    //     }
+        
+    //     // Calculate the sum of exp(x - max_val) for all elements along the specified axis
+    //     double sum_exp = 0.0;
+    //     for(int j=0; j<shape[axis]; j++){
+    //         // Create indices for the current element along the axis
+    //         vector<int> sum_indices = indices;
+    //         sum_indices[axis] = j;
+            
+    //         // Convert back to linear index
+    //         int sum_idx = 0;
+    //         for(int x=0; x<shape.size(); x++){
+    //             sum_idx += sum_indices[x] * strides[x];
+    //         }
+            
+    //         sum_exp += exp(at(sum_idx) - max_val);
+    //     }
+        
+    //     // Set the result: exp(x - max_val) / sum(exp(x - max_val))
+    //     result->at(i) = exp(at(i) - max_val) / sum_exp;
+    // }
 
     if(requires_grad){
         result->parents.push_back(shared_from_this());
@@ -1025,18 +1075,163 @@ shared_ptr<Tensor> Tensor::softmax(int axis, bool keepdims) {
             // printf("Backward softmax\n");
             // For softmax, the gradient is: grad_input = softmax * (grad_output - sum(grad_output * softmax))
             
-            // Compute the sum of grad_output * softmax along the axis
-            auto grad_softmax_product = result->grad * result;
-            auto grad_sum = grad_softmax_product->sum(axis, true);
+            // // Compute the sum of grad_output * softmax along the axis
+            // auto grad_softmax_product = result->grad * result;
+            // auto grad_sum = grad_softmax_product->sum(axis, true);
             
-            // Compute the gradient: softmax * (grad_output - sum)
-            auto grad_diff = result->grad - grad_sum->broadcast(shape, false);
-            auto final_grad = result * grad_diff;
+            // // Compute the gradient: softmax * (grad_output - sum)
+            // auto grad_diff = result->grad - grad_sum->broadcast(shape, false);
+            // auto final_grad = result * grad_diff;
             
-            this->grad = this->grad + final_grad;
+            // this->grad = this->grad + final_grad;
+            auto dot = (result*result->grad)->sum(axis, true);
+            this->grad += result*(result->grad-dot);
+            cout<<"gradient!"<<endl;
+            this->grad->print();
         };
     }
 
+    return result;
+}
+
+// shared_ptr<Tensor> Tensor::log_softmax(int axis, bool keepdims) {
+//     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+//     for(int i=0; i<result->size(); i++){
+//         // Convert linear index to multi-dimensional indices
+//         int curr = i;
+//         vector<int> indices(shape.size());
+//         for(int x=shape.size()-1; x>=0; x--){
+//             indices[x] = curr % shape[x];
+//             curr /= shape[x];
+//         }
+        
+//         // Find the maximum value along the axis for numerical stability
+//         double max_val = at(i);
+//         for(int j=0; j<shape[axis]; j++){
+//             // Create indices for the current element along the axis
+//             vector<int> max_indices = indices;
+//             max_indices[axis] = j;
+            
+//             // Convert back to linear index
+//             int max_idx = 0;
+//             for(int x=0; x<shape.size(); x++){
+//                 max_idx += max_indices[x] * strides[x];
+//             }
+            
+//             max_val = std::max(max_val, (double)at(max_idx));
+//         }
+        
+//         // Calculate the sum of exp(x - max_val) for all elements along the specified axis
+//         double sum_exp = 0.0;
+//         for(int j=0; j<shape[axis]; j++){
+//             // Create indices for the current element along the axis
+//             vector<int> sum_indices = indices;
+//             sum_indices[axis] = j;
+            
+//             // Convert back to linear index
+//             int sum_idx = 0;
+//             for(int x=0; x<shape.size(); x++){
+//                 sum_idx += sum_indices[x] * strides[x];
+//             }
+            
+//             sum_exp += exp(at(sum_idx) - max_val);
+//         }
+        
+//         // Set the result: log(exp(x - max_val) / sum(exp(x - max_val))) = (x - max_val) - log(sum_exp)
+//         result->at(i) = at(i) - max_val - log(sum_exp);
+//     }
+
+//     if(requires_grad){
+//         result->parents.push_back(shared_from_this());
+//         result->backward_fn = [this, result, axis]() {
+//             this->grad += result->grad - result->grad->sum(axis, true)->broadcast(shape, false);
+//         };
+//     }
+
+//     return result;
+// }
+
+// shared_ptr<Tensor> Tensor::negative_log_likelihood(const shared_ptr<Tensor>& y_true) {
+//     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+//     for(int i=0; i<result->size(); i++){
+//         result->at(i) = -log(at(i));
+//     }
+//     if(requires_grad){
+//         result->parents.push_back(y_true);
+//         result->parents.push_back(shared_from_this());
+//         result->backward_fn = [y_true, result, this](){
+//             if(y_true->requires_grad){
+//                 y_true->grad += result->grad;
+//             }
+//             if(requires_grad){
+//                 this->grad += result->grad;
+//             }
+//         };
+//     }
+//     return result;
+// }
+
+shared_ptr<Tensor> Tensor::cross_entropy(const shared_ptr<Tensor>& y_true, int axis, bool keepdims) {
+    if(axis<0){
+        axis+=shape.size();
+    }
+
+    if(axis>=shape.size()||axis<0){
+        throw std::runtime_error("Invalid axis");
+    }
+    
+    vector<int> new_shape;
+    for(int i=0; i<shape.size(); i++){
+        if(i==axis){
+            if(keepdims){
+                new_shape.push_back(1);
+            }
+        } else {
+            new_shape.push_back(shape[i]);
+        }
+    }
+
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+
+    for(int i=0; i<result->size(); i++){
+        int c=-1;
+        for(int j=0; j<shape[axis]; j++){
+
+            int curr=i;
+            int idx=0;
+            for(int x=0; x<shape.size(); x++){
+                if(x==axis){
+                    idx+=j*strides[x];
+                } else {
+                    idx+=(curr/result->strides[x])*strides[x];
+                }
+                curr%=result->strides[x];
+            }
+
+            result->at(i)+=exp(at(idx));
+
+            if(abs(y_true->at(idx)-1.0f)<=1e-5f){
+                c=idx;
+            }
+        }
+        if(c==-1){
+            throw std::runtime_error("Invalid y_true. No '1' found in ground truth vector.");
+        }
+        result->at(i)=log(result->at(i)+1e-9f)-at(c);
+    }
+
+    if(requires_grad){
+        result->parents.push_back(y_true);
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [y_true, result, axis, this](){
+            this->grad+=shared_from_this()->softmax(axis)-y_true;
+
+            // ASSUMES y_true DOESN'T REQUIRE GRADIENT
+            if(y_true->requires_grad){
+                throw std::runtime_error("y_true requires gradient. This is not supported.");
+            }
+        };
+    }
     return result;
 }
 
