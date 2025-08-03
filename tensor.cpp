@@ -420,6 +420,8 @@ shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
 
         result->backward_fn = [new_A, new_B, result](){
             // printf("Backward +\n");
+
+            // TODO: Confirm that this doesn't result in infinite loop
             if(new_A->requires_grad && new_A->grad!=nullptr){
                 new_A->grad += result->grad->reduce_to_shape(new_A->shape);
             }
@@ -444,9 +446,12 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
 
-    for(int i=0; i<new_A->size(); i++){
-        result->at(i) = new_A->at(i) - new_B->at(i);
-    }
+    // // CPU:
+    // for(int i=0; i<new_A->size(); i++){
+    //     result->at(i) = new_A->at(i) - new_B->at(i);
+    // }
+
+    launchSubtract(new_A->data, new_B->data, result->data, result->size());
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -458,7 +463,7 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
                 new_A->grad += result->grad->reduce_to_shape(new_A->shape);
             }
             if(new_B->requires_grad && new_B->grad!=nullptr){
-                new_B->grad += result->grad->reduce_to_shape(new_B->shape);
+                new_B->grad -= result->grad->reduce_to_shape(new_B->shape);
             }
         };
     }
@@ -479,9 +484,12 @@ shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
 
-    for(int i=0; i<new_A->size(); i++){
-        result->at(i) = new_A->at(i) * new_B->at(i);
-    }
+    // // CPU:
+    // for(int i=0; i<new_A->size(); i++){
+    //     result->at(i) = new_A->at(i) * new_B->at(i);
+    // }
+
+    launchMultiply(new_A->data, new_B->data, result->data, result->size());
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -513,9 +521,12 @@ shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
 
-    for(int i=0; i<new_A->size(); i++){
-        result->at(i) = new_A->at(i) / new_B->at(i);
-    }
+    // CPU:
+    // for(int i=0; i<new_A->size(); i++){
+    //     result->at(i) = new_A->at(i) / new_B->at(i);
+    // }
+
+    launchDivide(new_A->data, new_B->data, result->data, result->size());
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);

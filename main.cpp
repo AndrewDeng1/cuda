@@ -2,554 +2,188 @@
 #include <iostream>
 
 int main() {
-    // ===== SOFTMAX FUNCTION TEST =====
-    auto softmax_input = make_shared<Tensor>(
-        vector<int>{2, 3},
-        vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f},
-        true
-    );
 
-    cout << "SOFTMAX TEST - Input tensor:" << endl;
-    softmax_input->print();
-    // Expected: Tensor(2, 3): [1, 2, 3], [4, 5, 6]
 
-    auto softmax_output_axis1 = softmax_input->softmax(1);
-    cout << "SOFTMAX along axis 1 (softmax of each row):" << endl;
-    softmax_output_axis1->print();  
-    // Expected: Row 1: exp(1)=2.718, exp(2)=7.389, exp(3)=20.086, sum=30.193
-    // Expected: Row 1: [0.0900, 0.2447, 0.6652]
-    // Expected: Row 2: exp(4)=54.598, exp(5)=148.413, exp(6)=403.429, sum=606.440
-    // Expected: Row 2: [0.0900, 0.2447, 0.6652]
-    // Expected: Tensor(2, 3): [0.0900, 0.2447, 0.6652], [0.0900, 0.2447, 0.6652]
 
-    softmax_output_axis1->grad = make_shared<Tensor>(
-        vector<int>{2, 3},
-        vector<float>{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f},
-        true
-    );
+    // // Create a 2x3 tensor
+    vector<int> shape = {2, 4, 3};
+    vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f, 19.0f, 20.0f, 21.0f, 22.0f, 23.0f, 24.0f};
+    auto t1 = make_shared<Tensor>(shape, data, true);
+    // cout << t1->size() << endl;
+    // cout << t1->at({0, 0, 0}) << endl;
+    // cout << t1->at({1, 0, 0}) << endl;
+    // cout << t1->at({0, 1, 0}) << endl;
+    // cout << t1->at({1, 1, 0}) << endl;
+    // cout << t1->at({0, 2, 0}) << endl;
+    // cout << t1->at({1, 2, 0}) << endl;
+    // cout << t1->at({0, 3, 0}) << endl;
+    // cout << t1->at({1, 3, 0}) << endl;
+    // cout << t1->at({0, 0, 0, 2}) << endl;
+    auto t2 = t1->reshape({2, 3, 4});
+    auto t3 = t2->reshape({2, 12});
+    // cout << t3->at({0, 0}) << endl;   
+    // cout << t3->at({0, 1}) << endl;
+    // cout << t3->at({0, 2}) << endl;
+    // cout << t3->at({0, 3}) << endl;
+    // cout << t3->at({0, 4}) << endl;
+    // cout << t3->at({0, 5}) << endl;
+    // cout << t3->at({0, 6}) << endl;
+    // cout << t3->at({0, 7}) << endl;
+    // cout << t3->at({0, 8}) << endl;
+    // cout << t3->at({0, 9}) << endl;
+    // cout << t3->at({0, 10}) << endl;
+    // cout << t3->at({0, 11}) << endl;
+    // cout << t3->at({1, 0}) << endl;   
+    // cout << t3->at({1, 1}) << endl;
+    // cout << t3->at({1, 2}) << endl;
+    // cout << t3->at({1, 3}) << endl;
+    // cout << t3->at({1, 4}) << endl;
+    // cout << t3->at({1, 5}) << endl;
+    // cout << t3->at({1, 6}) << endl;
+    // cout << t3->at({1, 7}) << endl;
+    // cout << t3->at({1, 8}) << endl;
+    // cout << t3->at({1, 9}) << endl;
+    // cout << t3->at({1, 10}) << endl;
+    // cout << t3->at({1, 11}) << endl;
+    auto t4 = t3->sum(0, true);
+    // cout << t4->shape[0] << endl;
+    // cout << t4->shape[1] << endl;
+    // cout << t4->at({0, 0}) << endl;
+    // cout << t4->at({0, 1}) << endl;
+    // cout << t4->at({0, 2}) << endl;
+    // cout << t4->at({0, 3}) << endl;
+    // cout << t4->at({0, 4}) << endl;
+    // cout << t4->at({0, 5}) << endl;
+    // cout << t4->at({0, 6}) << endl;
+    // cout << t4->at({0, 7}) << endl;
+    // cout << t4->at({0, 8}) << endl;
+    // cout << t4->at({0, 9}) << endl;
+    // cout << t4->at({0, 10}) << endl;
+    // cout << t4->at({0, 11}) << endl;
+    auto t5 = t3->sum(1, true);
+    // cout << t5->shape[0] << endl;
+    // cout << t5->shape[1] << endl;
+    // cout << t5->at({0, 0}) << endl;
+    // cout << t5->at({1, 0}) << endl;
 
-    softmax_output_axis1->backward();
-    cout << "Gradients for SOFTMAX along axis 1:" << endl;
-    softmax_input->grad->print();  
-    // Expected: Gradients showing how changes in softmax output affect input
+    int sm1=0;
+    int sm2=0;
+    for(int i=0; i<data.size()/2; i++){
+        sm1+=data[i];
+        sm2+=data[i+data.size()/2];
+    }
+    // cout << sm1 << endl;
+    // cout << sm2 << endl;
 
-    auto softmax_output_axis0 = softmax_input->softmax(0);
-    cout << "SOFTMAX along axis 0 (softmax of each column):" << endl;
-    softmax_output_axis0->print();  
-    // Expected: Col 1: exp(1)=2.718, exp(4)=54.598, sum=57.316
-    // Expected: Col 1: [0.0474, 0.9526]
-    // Expected: Col 2: exp(2)=7.389, exp(5)=148.413, sum=155.802
-    // Expected: Col 2: [0.0474, 0.9526]
-    // Expected: Col 3: exp(3)=20.086, exp(6)=403.429, sum=423.515
-    // Expected: Col 3: [0.0474, 0.9526]
-    // Expected: Tensor(2, 3): [0.0474, 0.0474, 0.0474], [0.9526, 0.9526, 0.9526]
+    auto t6 = t1->sum(1, true);
+    // printf("t6 shape: %d, %d, %d\n", t6->shape[0], t6->shape[1], t6->shape[2]);
+    
+    // for(int i=0; i<t6->shape[0]; i++){
+    //     for(int j=0; j<t6->shape[2]; j++){
+    //         cout<<t6->at({i, 0, j})<<endl;
+    //     }
+    // }
 
-    softmax_output_axis0->grad = make_shared<Tensor>(
-        vector<int>{2, 3},
-        vector<float>{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
-        true
-    );
+    auto t7 = t1->reduce_to_shape({2, 1, 1});
+    // printf("t7 shape: %d, %d, %d\n", t7->shape[0], t7->shape[1], t7->shape[2]);
+    // cout<<t7->at({0, 0, 0})<<endl;
+    // cout<<t7->at({1, 0, 0})<<endl;
+    
+    // printf("t1 shape: %d, %d, %d\n", t1->shape[0], t1->shape[1], t1->shape[2]);
+    // printf("t7 shape: %d, %d, %d\n", t7->shape[0], t7->shape[1], t7->shape[2]);
+    auto t8 = t1 + t7;
 
-    softmax_output_axis0->backward();
-    cout << "Gradients for SOFTMAX along axis 0:" << endl;
-    softmax_input->grad->print();  
-    // Expected: Gradients showing how changes in softmax output affect input
+    auto a1 = make_shared<Tensor>(vector<int>{2, 1, 3}, vector<float>{1.0f, 100.0f, 1000.0f, 750.0f, 500.0f, 5000.0f}, true);
+    a1->print();
+    t1->print();
+    auto a2 = a1+t1;
+    // printf("a2 shape: %d, %d, %d\n", a2->shape[0], a2->shape[1], a2->shape[2]);
+    // cout << t1->at({0, 0, 0}) << endl;
+    // cout << t1->at({1, 0, 0}) << endl;
+    // cout << t1->at({0, 1, 0}) << endl;
+    // cout << t1->at({1, 1, 0}) << endl;
+    // cout << t1->at({0, 2, 0}) << endl;
+    // cout << t1->at({1, 2, 0}) << endl;
+    // cout << t1->at({0, 3, 0}) << endl;
+    // cout << t1->at({1, 3, 0}) << endl;
+    a2->print();
+    auto a3 = make_shared<Tensor>(vector<int>{2, 1, 3}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}, true);
+    auto a4 = make_shared<Tensor>(vector<int>{3, 1}, vector<float>{100.0f, 200.0f, 300.0f}, true);
+    auto a5 = a3+a4;
+    a5->print();
+    a5->grad = make_shared<Tensor>(vector<int>{2, 3, 3}, vector<float>{1000.0f, 2000.0f, 3000.0f, 4000.0f, 5000.0f, 6000.0f, 7000.0f, 8000.0f, 9000.0f, 10000.0f, 11000.0f, 12000.0f, 13000.0f, 14000.0f, 15000.0f, 16000.0f, 17000.0f, 18000.0f}, true);
+    a5->grad->print();
+    a5->backward();
+    a3->grad->print();
+    a4->grad->print();
 
-    // Test with negative values to see softmax behavior
-    auto softmax_input2 = make_shared<Tensor>(
-        vector<int>{2, 2},
-        vector<float>{-2.0f, 2.0f, -1.0f, 1.0f},
-        true
-    );
+    // grad
+    // 1000 2000 3000   10000 11000 12000
+    // 4000 5000 6000   13000 14000 15000
+    // 7000 8000 9000   16000 17000 18000
 
-    cout << "\nSecond SOFTMAX test - Input tensor with negative values:" << endl;
-    softmax_input2->print();
-    // Expected: Tensor(2, 2): [-2, 2], [-1, 1]
+    // a3->grad
+    // 5000+4000+7000 2000+5000+8000 3000+6000+9000    10000+13000+16000 11000+14000+17000 12000+15000+18000
+    // = 16000 15000 18000    33000 42000 45000
 
-    auto softmax_output2 = softmax_input2->softmax(1);
-    cout << "SOFTMAX along axis 1 (with negative values):" << endl;
-    softmax_output2->print();  
-    // Expected: Row 1: exp(-2)=0.1353, exp(2)=7.3891, sum=7.5244
-    // Expected: Row 1: [0.0180, 0.9820]
-    // Expected: Row 2: exp(-1)=0.3679, exp(1)=2.7183, sum=3.0862
-    // Expected: Row 2: [0.1192, 0.8808]
-    // Expected: Tensor(2, 2): [0.0180, 0.9820], [0.1192, 0.8808]
+    // a4->grad
+    // (1000+10000) + (2000+11000) + (3000+12000)
+    // (4000+13000) + (5000+14000) + (6000+15000)
+    // (7000+16000) + (8000+17000) + (9000+18000)
+    // = 11000+13000+15000
+    // = 17000+19000+21000
+    // = 23000+25000+27000
+    // = 39000
+    // = 57000
+    // = 75000
 
-    softmax_output2->grad = make_shared<Tensor>(
-        vector<int>{2, 2},
-        vector<float>{1.0f, 0.0f, 0.0f, 1.0f},
-        true
-    );
+    auto a6 = make_shared<Tensor>(vector<int>{1, 1, 1, 1}, vector<float>{1.0f}, true);
+    auto a7 = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}, true);
 
-    softmax_output2->backward();
-    cout << "Gradients for SOFTMAX with negative values:" << endl;
-    softmax_input2->grad->print();  
-    // Expected: Gradients showing how changes in softmax output affect input
+    // a6+=a7;
+    // auto a8=a6;
+    auto a8 = a7-a6;
+    a8->print();
+    a8->grad = make_shared<Tensor>(vector<int>{1, 1, 2, 3}, vector<float>{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}, true);
+    a8->backward();
+    a6->grad->print();
+    a7->grad->print();
 
-    // Test with large values to check numerical stability
-    auto softmax_input3 = make_shared<Tensor>(
-        vector<int>{1, 3},
-        vector<float>{100.0f, 101.0f, 102.0f},
-        true
-    );
-
-    cout << "\nThird SOFTMAX test - Input tensor with large values:" << endl;
-    softmax_input3->print();
-    // Expected: Tensor(1, 3): [100, 101, 102]
-
-    auto softmax_output3 = softmax_input3->softmax(1);
-    cout << "SOFTMAX with large values (should be numerically stable):" << endl;
-    softmax_output3->print();  
-    // Expected: Should handle large values without overflow
-    // Expected: exp(100), exp(101), exp(102) are very large but ratios should be correct
-    // Expected: Tensor(1, 3): [0.0900, 0.2447, 0.6652] (approximate ratios)
-
-    softmax_output3->grad = make_shared<Tensor>(
-        vector<int>{1, 3},
-        vector<float>{1.0f, 0.0f, 0.0f},
-        true
-    );
-
-    softmax_output3->backward();
-    cout << "Gradients for SOFTMAX with large values:" << endl;
-    softmax_input3->grad->print();  
-    // Expected: Gradients should be computed correctly even with large input values
-
-    // ===== HIGHER DIMENSION SOFTMAX TEST =====
-    cout << "\n" << string(50, '=') << endl;
-    cout << "HIGHER DIMENSION SOFTMAX TEST" << endl;
-    cout << string(50, '=') << endl;
-
-    // Create 3D input tensor (batch_size=2, sequence_length=3, num_classes=4)
-    auto softmax_input_3d = make_shared<Tensor>(
-        vector<int>{2, 3, 4},
-        vector<float>{
-            // Batch 0, Sequence 0: [0.1, 0.2, 0.3, 0.4]
-            0.1f, 0.2f, 0.3f, 0.4f,
-            // Batch 0, Sequence 1: [0.5, 0.6, 0.7, 0.8]
-            0.5f, 0.6f, 0.7f, 0.8f,
-            // Batch 0, Sequence 2: [0.9, 1.0, 1.1, 1.2]
-            0.9f, 1.0f, 1.1f, 1.2f,
-            // Batch 1, Sequence 0: [1.3, 1.4, 1.5, 1.6]
-            1.3f, 1.4f, 1.5f, 1.6f,
-            // Batch 1, Sequence 1: [1.7, 1.8, 1.9, 2.0]
-            1.7f, 1.8f, 1.9f, 2.0f,
-            // Batch 1, Sequence 2: [2.1, 2.2, 2.3, 2.4]
-            2.1f, 2.2f, 2.3f, 2.4f
-        },
-        true
-    );
-
-    cout << "3D Input tensor shape: [" << softmax_input_3d->shape[0] << ", " 
-         << softmax_input_3d->shape[1] << ", " << softmax_input_3d->shape[2] << "]" << endl;
-    cout << "3D Input tensor:" << endl;
-    softmax_input_3d->print();
-
-    // Test softmax along the last axis (axis 2) - class probabilities
-    auto softmax_output_3d_axis2 = softmax_input_3d->softmax(2);
-    cout << "3D SOFTMAX along axis 2 (class probabilities):" << endl;
-    softmax_output_3d_axis2->print();
-    // Expected: Should compute softmax for each sequence position across classes
-
-    softmax_output_3d_axis2->grad = make_shared<Tensor>(
-        vector<int>{2, 3, 4},
-        vector<float>{
-            1.0f, 0.0f, 0.0f, 0.0f,  // Batch 0, Sequence 0
-            0.0f, 1.0f, 0.0f, 0.0f,  // Batch 0, Sequence 1
-            0.0f, 0.0f, 1.0f, 0.0f,  // Batch 0, Sequence 2
-            0.0f, 0.0f, 0.0f, 1.0f,  // Batch 1, Sequence 0
-            1.0f, 0.0f, 0.0f, 0.0f,  // Batch 1, Sequence 1
-            0.0f, 1.0f, 0.0f, 0.0f   // Batch 1, Sequence 2
-        },
-        true
-    );
-
-    softmax_output_3d_axis2->backward();
-    cout << "3D Gradients for SOFTMAX along axis 2:" << endl;
-    softmax_input_3d->grad->print();
-
-    // Test softmax along the sequence axis (axis 1) - attention weights
-    auto softmax_output_3d_axis1 = softmax_input_3d->softmax(1);
-    cout << "3D SOFTMAX along axis 1 (attention weights):" << endl;
-    softmax_output_3d_axis1->print();
-    // Expected: Should compute softmax across sequence positions for each class
-
-    softmax_output_3d_axis1->grad = make_shared<Tensor>(
-        vector<int>{2, 3, 4},
-        vector<float>{
-            1.0f, 1.0f, 1.0f, 1.0f,  // Batch 0, Sequence 0
-            0.0f, 0.0f, 0.0f, 0.0f,  // Batch 0, Sequence 1
-            0.0f, 0.0f, 0.0f, 0.0f,  // Batch 0, Sequence 2
-            0.0f, 0.0f, 0.0f, 0.0f,  // Batch 1, Sequence 0
-            1.0f, 1.0f, 1.0f, 1.0f,  // Batch 1, Sequence 1
-            0.0f, 0.0f, 0.0f, 0.0f   // Batch 1, Sequence 2
-        },
-        true
-    );
-
-    softmax_output_3d_axis1->backward();
-    cout << "3D Gradients for SOFTMAX along axis 1:" << endl;
-    softmax_input_3d->grad->print();
-
-    // ===== 4D TENSOR TEST (BATCH, CHANNELS, HEIGHT, WIDTH) =====
-    cout << "\n" << string(50, '=') << endl;
-    cout << "4D TENSOR SOFTMAX TEST" << endl;
-    cout << string(50, '=') << endl;
-
-    // Create 4D input tensor (batch_size=2, channels=3, height=2, width=2)
-    auto softmax_input_4d = make_shared<Tensor>(
-        vector<int>{2, 3, 2, 2},
-        vector<float>{
-            // Batch 0, Channel 0
-            0.1f, 0.2f, 0.3f, 0.4f,
-            // Batch 0, Channel 1
-            0.5f, 0.6f, 0.7f, 0.8f,
-            // Batch 0, Channel 2
-            0.9f, 1.0f, 1.1f, 1.2f,
-            // Batch 1, Channel 0
-            1.3f, 1.4f, 1.5f, 1.6f,
-            // Batch 1, Channel 1
-            1.7f, 1.8f, 1.9f, 2.0f,
-            // Batch 1, Channel 2
-            2.1f, 2.2f, 2.3f, 2.4f
-        },
-        true
-    );
-
-    cout << "4D Input tensor shape: [" << softmax_input_4d->shape[0] << ", " 
-         << softmax_input_4d->shape[1] << ", " << softmax_input_4d->shape[2] << ", " 
-         << softmax_input_4d->shape[3] << "]" << endl;
-    cout << "4D Input tensor:" << endl;
-    softmax_input_4d->print();
-
-    // Test softmax along the channel axis (axis 1) - multi-class segmentation
-    auto softmax_output_4d_axis1 = softmax_input_4d->softmax(1);
-    cout << "4D SOFTMAX along axis 1 (channel probabilities):" << endl;
-    softmax_output_4d_axis1->print();
-    // Expected: Should compute softmax across channels for each spatial position
-
-    softmax_output_4d_axis1->grad = make_shared<Tensor>(
-        vector<int>{2, 3, 2, 2},
-        vector<float>{
-            // Batch 0, Channel 0
-            1.0f, 0.0f, 0.0f, 1.0f,
-            // Batch 0, Channel 1
-            0.0f, 1.0f, 0.0f, 0.0f,
-            // Batch 0, Channel 2
-            0.0f, 0.0f, 1.0f, 0.0f,
-            // Batch 1, Channel 0
-            0.0f, 1.0f, 0.0f, 0.0f,
-            // Batch 1, Channel 1
-            1.0f, 0.0f, 0.0f, 1.0f,
-            // Batch 1, Channel 2
-            0.0f, 0.0f, 1.0f, 0.0f
-        },
-        true
-    );
-
-    softmax_output_4d_axis1->backward();
-    cout << "4D Gradients for SOFTMAX along axis 1:" << endl;
-    softmax_input_4d->grad->print();
-
-    // Test softmax along the spatial axes (axis 2 and 3) - spatial attention
-    auto softmax_output_4d_axis2 = softmax_input_4d->softmax(2);
-    cout << "4D SOFTMAX along axis 2 (height attention):" << endl;
-    softmax_output_4d_axis2->print();
-    // Expected: Should compute softmax across height dimension
-
-    softmax_output_4d_axis2->grad = make_shared<Tensor>(
-        vector<int>{2, 3, 2, 2},
-        vector<float>{
-            // Batch 0, Channel 0
-            1.0f, 1.0f, 0.0f, 0.0f,
-            // Batch 0, Channel 1
-            1.0f, 1.0f, 0.0f, 0.0f,
-            // Batch 0, Channel 2
-            1.0f, 1.0f, 0.0f, 0.0f,
-            // Batch 1, Channel 0
-            1.0f, 1.0f, 0.0f, 0.0f,
-            // Batch 1, Channel 1
-            1.0f, 1.0f, 0.0f, 0.0f,
-            // Batch 1, Channel 2
-            1.0f, 1.0f, 0.0f, 0.0f
-        },
-        true
-    );
-
-    softmax_output_4d_axis2->backward();
-    cout << "4D Gradients for SOFTMAX along axis 2:" << endl;
-    softmax_input_4d->grad->print();
-
-    // ===== SIMPLE 2x2 SOFTMAX TEST (Batch 0, Channel 0) =====
-    cout << "\n" << string(50, '=') << endl;
-    cout << "SIMPLE 2x2 SOFTMAX TEST (Batch 0, Channel 0)" << endl;
-    cout << string(50, '=') << endl;
-
-    // Extract batch 0, channel 0 from the 4D tensor (should be 2x2)
-    // From the 4D input: [[[0.1, 0.2], [0.3, 0.4]], ...]
-    // We want: [[0.1, 0.2], [0.3, 0.4]]
-    auto simple_2x2 = make_shared<Tensor>(
-        vector<int>{2, 2},
-        vector<float>{0.1f, 0.2f, 0.3f, 0.4f},
-        true
-    );
-
-    cout << "Simple 2x2 input tensor:" << endl;
-    simple_2x2->print();
-    // Expected: Tensor(2, 2): [0.1, 0.2], [0.3, 0.4]
-
-    // Apply softmax along axis 1 (row-wise)
-    auto simple_softmax = simple_2x2->softmax(1);
-    cout << "Simple 2x2 SOFTMAX along axis 1 (row-wise):" << endl;
-    simple_softmax->print();
-    // Expected: Row 1: exp(0.1)=1.105, exp(0.2)=1.221, sum=2.326
-    // Expected: Row 1: [0.475, 0.525]
-    // Expected: Row 2: exp(0.3)=1.350, exp(0.4)=1.492, sum=2.842
-    // Expected: Row 2: [0.475, 0.525]
-
-    // Set gradient to same pattern as before
-    simple_softmax->grad = make_shared<Tensor>(
-        vector<int>{2, 2},
-        vector<float>{1.0f, 0.0f, 0.0f, 1.0f},
-        true
-    );
-
-    simple_softmax->backward();
-    cout << "Simple 2x2 Gradients for SOFTMAX:" << endl;
-    simple_2x2->grad->print();
-
-    return 0;
+    a8->print();
+    auto a9 = a8->transpose(-2, -1);
+    a9->print();
+    a9->grad = make_shared<Tensor>(vector<int>{1, 1, 3, 2}, vector<float>{10.0f, 10.0f, 10.0f, 10.0f, 10.0f, 10.0f}, true);
+    a9->backward();
+    a8->grad->print();
 }
 
 
 
-// SOFTMAX TEST - Input tensor:
+
+
+// Tensor(2, 1, 3):
+// [[1 , 100 , 1000 ]], [[750 , 500 , 5000 ]]
+// Tensor(2, 4, 3):
+// [[1 , 2 , 3 ], [4 , 5 , 6 ], [7 , 8 , 9 ], [10 , 11 , 12 ]], [[13 , 14 , 15 ], [16 , 17 , 18 ], [19 , 20 , 21 ], [22 , 23 , 24 ]]
+// Tensor(2, 4, 3):
+// [[2 , 102 , 1003 ], [5 , 105 , 1006 ], [8 , 108 , 1009 ], [11 , 111 , 1012 ]], [[763 , 514 , 5015 ], [766 , 517 , 5018 ], [769 , 520 , 5021 ], [772 , 523 , 5024 ]]
+// Tensor(2, 3, 3):
+// [[101 , 102 , 103 ], [201 , 202 , 203 ], [301 , 302 , 303 ]], [[104 , 105 , 106 ], [204 , 205 , 206 ], [304 , 305 , 306 ]]
+// Tensor(2, 3, 3):
+// [[1000 , 2000 , 3000 ], [4000 , 5000 , 6000 ], [7000 , 8000 , 9000 ]], [[10000 , 11000 , 12000 ], [13000 , 14000 , 15000 ], [16000 , 17000 , 18000 ]]
+// Tensor(2, 1, 3):
+// [[12000 , 15000 , 18000 ]], [[21000 , 24000 , 27000 ]]
+// Tensor(3, 1):
+// [39000 ], [45000 ], [51000 ]
+// Tensor(1, 1, 2, 3):
+// [[[0 , 1 , 2 ], [3 , 4 , 5 ]]]
+// Tensor(1, 1, 1, 1):
+// [[[6 ]]]
 // Tensor(2, 3):
-// [1 , 2 , 3 ], [4 , 5 , 6 ]
-// SOFTMAX along axis 1 (softmax of each row):
-// Tensor(2, 3):
-// [0.0900306 , 0.244728 , 0.665241 ], [0.0900306 , 0.244728 , 0.665241 ]
-// Gradients for SOFTMAX along axis 1:
-// Tensor(2, 3):
-// [0.0819251 , -0.022033, -0.059892], [-0.022033, 0.184836 , -0.162803]
-// SOFTMAX along axis 0 (softmax of each column):
-// Tensor(2, 3):
-// [0.0474259 , 0.0474259 , 0.0474259 ], [0.952574 , 0.952574 , 0.952574 ]
-// Gradients for SOFTMAX along axis 0:
-// Tensor(2, 3):
-// [0.127102 , -0.022033, -0.105069], [-0.0672097, 0.184836 , -0.117627]
-
-// Second SOFTMAX test - Input tensor with negative values:
-// Tensor(2, 2):
-// [-2, 2 ], [-1, 1 ]
-// SOFTMAX along axis 1 (with negative values):
-// Tensor(2, 2):
-// [0.0179862 , 0.982014 ], [0.119203 , 0.880797 ]
-// Gradients for SOFTMAX with negative values:
-// Tensor(2, 2):
-// [0.0176627 , -0.0176627], [-0.104994, 0.104994 ]
-
-// Third SOFTMAX test - Input tensor with large values:
-// Tensor(1, 3):
-// [100 , 101 , 102 ]
-// SOFTMAX with large values (should be numerically stable):
-// Tensor(1, 3):
-// [0.0900306 , 0.244728 , 0.665241 ]
-// Gradients for SOFTMAX with large values:
-// Tensor(1, 3):
-// [0.0819251 , -0.022033, -0.059892]
-
-
-
-// #include "tensor.h"
-// #include <iostream>
-
-// int main() {
-//     // ===== CROSS ENTROPY FUNCTION TEST =====
-    
-//     // Create input logits (predictions)
-//     auto logits = make_shared<Tensor>(
-//         vector<int>{2, 3},
-//         vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f},
-//         true
-//     );
-
-//     // Create target labels (one-hot encoded)
-//     auto targets = make_shared<Tensor>(
-//         vector<int>{2, 3},
-//         vector<float>{0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f},
-//         false
-//     );
-
-//     cout << "CROSS ENTROPY TEST" << endl;
-//     cout << "Input logits:" << endl;
-//     logits->print();
-//     // Expected: Tensor(2, 3): [1, 2, 3], [4, 5, 6]
-
-//     cout << "Target labels (one-hot):" << endl;
-//     targets->print();
-//     // Expected: Tensor(2, 3): [0, 0, 1], [0, 1, 0]
-
-//     // Compute cross entropy loss
-//     auto loss = logits->cross_entropy(targets, 1, true);
-//     cout << "Cross entropy loss:" << endl;
-//     loss->print();
-//     // Expected: Should compute cross entropy loss for each sample
-
-//     // Set gradient for backward pass
-//     loss->grad = make_shared<Tensor>(
-//         vector<int>{2, 1},
-//         vector<float>{1.0f, 1.0f},
-//         true
-//     );
-
-//     // Compute gradients
-//     loss->backward();
-//     cout << "Gradients for logits:" << endl;
-//     logits->grad->print();
-//     // Expected: Gradients showing how changes in loss affect logits
-
-//     // ===== HIGHER DIMENSION CROSS ENTROPY TEST =====
-//     cout << "\n" << string(50, '=') << endl;
-//     cout << "HIGHER DIMENSION CROSS ENTROPY TEST" << endl;
-//     cout << string(50, '=') << endl;
-
-//     // Create 3D input logits (batch_size=2, sequence_length=3, num_classes=4)
-//     auto logits_3d = make_shared<Tensor>(
-//         vector<int>{2, 3, 4},
-//         vector<float>{
-//             // Batch 0, Sequence 0: [0.1, 0.2, 0.3, 0.4]
-//             0.1f, 0.2f, 0.3f, 0.4f,
-//             // Batch 0, Sequence 1: [0.5, 0.6, 0.7, 0.8]
-//             0.5f, 0.6f, 0.7f, 0.8f,
-//             // Batch 0, Sequence 2: [0.9, 1.0, 1.1, 1.2]
-//             0.9f, 1.0f, 1.1f, 1.2f,
-//             // Batch 1, Sequence 0: [1.3, 1.4, 1.5, 1.6]
-//             1.3f, 1.4f, 1.5f, 1.6f,
-//             // Batch 1, Sequence 1: [1.7, 1.8, 1.9, 2.0]
-//             1.7f, 1.8f, 1.9f, 2.0f,
-//             // Batch 1, Sequence 2: [2.1, 2.2, 2.3, 2.4]
-//             2.1f, 2.2f, 2.3f, 2.4f
-//         },
-//         true
-//     );
-
-//     // Create 3D target labels (one-hot encoded)
-//     auto targets_3d = make_shared<Tensor>(
-//         vector<int>{2, 3, 4},
-//         vector<float>{
-//             // Batch 0, Sequence 0: class 2
-//             0.0f, 0.0f, 1.0f, 0.0f,
-//             // Batch 0, Sequence 1: class 0
-//             1.0f, 0.0f, 0.0f, 0.0f,
-//             // Batch 0, Sequence 2: class 3
-//             0.0f, 0.0f, 0.0f, 1.0f,
-//             // Batch 1, Sequence 0: class 1
-//             0.0f, 1.0f, 0.0f, 0.0f,
-//             // Batch 1, Sequence 1: class 2
-//             0.0f, 0.0f, 1.0f, 0.0f,
-//             // Batch 1, Sequence 2: class 0
-//             1.0f, 0.0f, 0.0f, 0.0f
-//         },
-//         false
-//     );
-
-//     cout << "3D Input logits shape: [" << logits_3d->shape[0] << ", " 
-//          << logits_3d->shape[1] << ", " << logits_3d->shape[2] << "]" << endl;
-//     cout << "3D Input logits:" << endl;
-//     logits_3d->print();
-
-//     cout << "3D Target labels (one-hot):" << endl;
-//     targets_3d->print();
-
-//     // Compute cross entropy loss along the last axis (axis 2)
-//     auto loss_3d = logits_3d->cross_entropy(targets_3d, 2, true);
-//     cout << "3D Cross entropy loss:" << endl;
-//     loss_3d->print();
-//     // Expected: Should compute cross entropy loss for each sequence position
-
-//     // Set gradient for backward pass
-//     loss_3d->grad = make_shared<Tensor>(
-//         vector<int>{2, 3, 1},
-//         vector<float>{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
-//         true
-//     );
-
-//     // Compute gradients
-//     loss_3d->backward();
-//     cout << "3D Gradients for logits:" << endl;
-//     logits_3d->grad->print();
-
-//     // ===== 4D TENSOR TEST (BATCH, CHANNELS, HEIGHT, WIDTH) =====
-//     cout << "\n" << string(50, '=') << endl;
-//     cout << "4D TENSOR CROSS ENTROPY TEST" << endl;
-//     cout << string(50, '=') << endl;
-
-//     // Create 4D input logits (batch_size=2, channels=3, height=2, width=2)
-//     auto logits_4d = make_shared<Tensor>(
-//         vector<int>{2, 3, 2, 2},
-//         vector<float>{
-//             // Batch 0, Channel 0
-//             0.1f, 0.2f, 0.3f, 0.4f,
-//             // Batch 0, Channel 1
-//             0.5f, 0.6f, 0.7f, 0.8f,
-//             // Batch 0, Channel 2
-//             0.9f, 1.0f, 1.1f, 1.2f,
-//             // Batch 1, Channel 0
-//             1.3f, 1.4f, 1.5f, 1.6f,
-//             // Batch 1, Channel 1
-//             1.7f, 1.8f, 1.9f, 2.0f,
-//             // Batch 1, Channel 2
-//             2.1f, 2.2f, 2.3f, 2.4f
-//         },
-//         true
-//     );
-
-//     // Create 4D target labels (one-hot encoded)
-//     auto targets_4d = make_shared<Tensor>(
-//         vector<int>{2, 3, 2, 2},
-//         vector<float>{
-//             // Batch 0, Channel 0
-//             1.0f, 0.0f, 0.0f, 1.0f,
-//             // Batch 0, Channel 1
-//             0.0f, 1.0f, 0.0f, 0.0f,
-//             // Batch 0, Channel 2
-//             0.0f, 0.0f, 1.0f, 0.0f,
-//             // Batch 1, Channel 0
-//             0.0f, 1.0f, 0.0f, 0.0f,
-//             // Batch 1, Channel 1
-//             1.0f, 0.0f, 0.0f, 1.0f,
-//             // Batch 1, Channel 2
-//             0.0f, 0.0f, 1.0f, 0.0f
-//         },
-//         false
-//     );
-
-//     cout << "4D Input logits shape: [" << logits_4d->shape[0] << ", " 
-//          << logits_4d->shape[1] << ", " << logits_4d->shape[2] << ", " 
-//          << logits_4d->shape[3] << "]" << endl;
-//     cout << "4D Input logits:" << endl;
-//     logits_4d->print();
-
-//     cout << "4D Target labels (one-hot):" << endl;
-//     targets_4d->print();
-
-//     // Compute cross entropy loss along the channel axis (axis 1)
-//     auto loss_4d = logits_4d->cross_entropy(targets_4d, 1, true);
-//     cout << "4D Cross entropy loss:" << endl;
-//     loss_4d->print();
-
-//     // Set gradient for backward pass
-//     loss_4d->grad = make_shared<Tensor>(
-//         vector<int>{2, 1, 2, 2},
-//         vector<float>{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
-//         true
-//     );
-
-//     // Compute gradients
-//     loss_4d->backward();
-//     cout << "4D Gradients for logits:" << endl;
-//     logits_4d->grad->print();
-
-//     return 0;
-// }
+// [1 , 1 , 1 ], [1 , 1 , 1 ]
+// Tensor(1, 1, 2, 3):
+// [[[0 , 1 , 2 ], [3 , 4 , 5 ]]]
+// Tensor(1, 1, 3, 2):
+// [[[0 , 1 ], [2 , 3 ], [4 , 5 ]]]
+// Tensor(1, 1, 2, 3):
+// [[[11 , 11 , 11 ], [11 , 11 , 11 ]]]
