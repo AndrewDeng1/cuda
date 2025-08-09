@@ -314,21 +314,24 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
         padded_strides.insert(padded_strides.begin(), 0);  // Stride of 0 for size-1 dimensions
     }
 
-    for(int i=0; i<result->size(); i++) {
-        int curr = i;
-        int idx = 0;
-        for(int j=0; j<new_shape.size()-2*matmul; j++) {
-            int dim = curr/result->strides[j];
-            curr %= result->strides[j];
+    // // CPU:
+    // for(int i=0; i<result->size(); i++) {
+    //     int curr = i;
+    //     int idx = 0;
+    //     for(int j=0; j<new_shape.size()-2*matmul; j++) {
+    //         int dim = curr/result->strides[j];
+    //         curr %= result->strides[j];
             
-            if(padded_shape[j] == 1) {
-                idx += 0;  // Don't add to index for broadcasted dimensions
-            } else {
-                idx += padded_strides[j] * dim;
-            }
-        }
-        result->at(i) = at(idx);
-    }
+    //         if(padded_shape[j] == 1) {
+    //             idx += 0;  // Don't add to index for broadcasted dimensions
+    //         } else {
+    //             idx += padded_strides[j] * dim;
+    //         }
+    //     }
+    //     result->at(i) = at(idx);
+    // }
+
+    launchBroadcast(shared_from_this(), result, padded_shape, padded_strides, matmul);
 
     if(requires_grad) {
         result->parents.push_back(shared_from_this());
@@ -412,7 +415,7 @@ shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) + new_B->at(i);
     // }
 
-    launchAdd(new_A->data, new_B->data, result->data, result->size());
+    launchAdd(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -451,7 +454,7 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) - new_B->at(i);
     // }
 
-    launchSubtract(new_A->data, new_B->data, result->data, result->size());
+    launchSubtract(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -489,7 +492,7 @@ shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) * new_B->at(i);
     // }
 
-    launchMultiply(new_A->data, new_B->data, result->data, result->size());
+    launchMultiply(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -526,7 +529,7 @@ shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) / new_B->at(i);
     // }
 
-    launchDivide(new_A->data, new_B->data, result->data, result->size());
+    launchDivide(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
