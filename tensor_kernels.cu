@@ -260,7 +260,10 @@ void launchBroadcast(shared_ptr<Tensor>a, shared_ptr<Tensor>b, vector<int>& padd
     d_b_struct.strides_size_bytes = b_struct.strides_size_bytes;
     d_b_struct.data_size = b_struct.data_size;
     d_b_struct.data_size_bytes = b_struct.data_size_bytes;
-    printf("c0.5");
+    
+    cudaMallocTensorStruct(d_a_struct, a_struct);
+    cudaMallocTensorStruct(d_b_struct, b_struct);
+    
     // Copy input metadata and input data to device. For b, shape/strides are needed
     cudaMemcpyTensorStruct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
     // cudaMemcpyTensorStruct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
