@@ -332,8 +332,10 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
     // }
 
     launchBroadcast(shared_from_this(), result, padded_shape, padded_strides, matmul);
+    printf("done broadcast\n");
 
     if(requires_grad) {
+        printf("starting requires_grad broadcast\n");
         result->parents.push_back(shared_from_this());
         result->backward_fn = [this, result]() {
             // printf("Backward broadcast\n");
@@ -343,6 +345,7 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
             this->grad = this->grad + reduced_grad;
         };
     }
+    printf("gonna return broadcast\n");
 
     return result;
 }
