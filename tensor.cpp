@@ -211,23 +211,26 @@ shared_ptr<Tensor> Tensor::sum(int axis, bool keepdims) {
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
 
-    for(int i=0; i<result->size(); i++){
-        for(int j=0; j<shape[axis]; j++){
+    // CPU:
+    // for(int i=0; i<result->size(); i++){
+    //     for(int j=0; j<shape[axis]; j++){
 
-            int curr=i;
-            int idx=0;
-            for(int x=0; x<shape.size(); x++){
-                if(x==axis){
-                    idx+=j*strides[x];
-                } else {
-                    idx+=(curr/result->strides[x])*strides[x];
-                }
-                curr%=result->strides[x];
-            }
+    //         int curr=i;
+    //         int idx=0;
+    //         for(int x=0; x<shape.size(); x++){
+    //             if(x==axis){
+    //                 idx+=j*strides[x];
+    //             } else {
+    //                 idx+=(curr/result->strides[x])*strides[x];
+    //             }
+    //             curr%=result->strides[x];
+    //         }
 
-            result->at(i)+=at(idx);
-        }
-    }
+    //         result->at(i)+=at(idx);
+    //     }
+    // }
+
+    launch_sum(shared_from_this(), result, axis);
 
     if(requires_grad){
         result->parents.push_back(shared_from_this());
@@ -331,11 +334,9 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
     //     result->at(i) = at(idx);
     // }
 
-    launchBroadcast(shared_from_this(), result, padded_shape, padded_strides, matmul);
-    printf("done broadcast\n");
+    launch_broadcast(shared_from_this(), result, padded_shape, padded_strides, matmul);
 
     if(requires_grad) {
-        printf("starting requires_grad broadcast\n");
         result->parents.push_back(shared_from_this());
         result->backward_fn = [this, result]() {
             // printf("Backward broadcast\n");
@@ -345,7 +346,6 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
             this->grad = this->grad + reduced_grad;
         };
     }
-    printf("gonna return broadcast\n");
 
     return result;
 }
@@ -418,7 +418,7 @@ shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) + new_B->at(i);
     // }
 
-    launchAdd(new_A, new_B, result);
+    launch_add(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -457,7 +457,7 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) - new_B->at(i);
     // }
 
-    launchSubtract(new_A, new_B, result);
+    launch_subtract(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -495,7 +495,7 @@ shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) * new_B->at(i);
     // }
 
-    launchMultiply(new_A, new_B, result);
+    launch_multiply(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -532,7 +532,7 @@ shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     //     result->at(i) = new_A->at(i) / new_B->at(i);
     // }
 
-    launchDivide(new_A, new_B, result);
+    launch_divide(new_A, new_B, result);
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);

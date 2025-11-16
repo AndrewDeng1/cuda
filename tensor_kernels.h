@@ -1,8 +1,9 @@
 #pragma once
 #include "tensor.h"
 
-void launchAdd(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
-void launchSubtract(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
-void launchMultiply(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
-void launchDivide(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
-void launchBroadcast(shared_ptr<Tensor> a, shared_ptr<Tensor> b, vector<int>& padded_shae, vector<int>& padded_strides, bool matmul);
+void launch_add(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
+void launch_subtract(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
+void launch_multiply(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
+void launch_divide(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result);
+void launch_broadcast(shared_ptr<Tensor> a, shared_ptr<Tensor> b, vector<int>& padded_shape, vector<int>& padded_strides, bool matmul);
+void launch_sum(shared_ptr<Tensor> a, shared_ptr<Tensor> b, int axis);
