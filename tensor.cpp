@@ -917,9 +917,14 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
 
 shared_ptr<Tensor> Tensor::pow(float exponent) {
     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
-    for(int i=0; i<result->size(); i++){
-        result->at(i) = std::pow(at(i), exponent);
-    }
+    
+    // CPU:
+    // for(int i=0; i<result->size(); i++){
+    //     result->at(i) = std::pow(at(i), exponent);
+    // }
+
+    launch_pow(shared_from_this(), result, exponent);
+
     if(requires_grad){
         result->parents.push_back(shared_from_this());
         result->backward_fn = [exponent, result, this](){
@@ -947,9 +952,14 @@ shared_ptr<Tensor> Tensor::norm(int axis, bool keepdims) {
 
 shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A) {
     shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
-    for(int i=0; i<result->size(); i++){
-        result->at(i) = std::max(0.0f, A->at(i));
-    }
+    
+    // CPU:
+    // for(int i=0; i<result->size(); i++){
+    //     result->at(i) = std::max(0.0f, A->at(i));
+    // }
+
+    launch_relu(A, result);
+
     if(A->requires_grad){
         result->parents.push_back(A);
         result->backward_fn = [A, result](){
@@ -967,9 +977,14 @@ shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A) {
 
 shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A) {
     shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
-    for(int i=0; i<result->size(); i++){
-        result->at(i) = 1.0f/(1.0f+exp(-A->at(i)));
-    }
+    
+    // CPU:
+    // for(int i=0; i<result->size(); i++){
+    //     result->at(i) = 1.0f/(1.0f+exp(-A->at(i)));
+    // }
+
+    launch_sigmoid(A, result);
+
     if(A->requires_grad){
         result->parents.push_back(A);
         result->backward_fn = [A, result](){
@@ -981,9 +996,14 @@ shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A) {
 
 shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
     shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
-    for(int i=0; i<result->size(); i++){
-        result->at(i) = (exp(A->at(i)) - exp(-A->at(i))) / (exp(A->at(i)) + exp(-A->at(i)));
-    }
+    
+    // CPU:
+    // for(int i=0; i<result->size(); i++){
+    //     result->at(i) = (exp(A->at(i)) - exp(-A->at(i))) / (exp(A->at(i)) + exp(-A->at(i)));
+    // }
+
+    launch_tanh(A, result);
+
     if(A->requires_grad){
         result->parents.push_back(A);
         result->backward_fn = [A, result](){
@@ -1014,32 +1034,38 @@ shared_ptr<Tensor> Tensor::softmax(int axis) {
 
     shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, requires_grad);
 
-    for(int i=0; i<sm_exp->size(); i++){
-        for(int j=0; j<shape[axis]; j++){
+    // CPU:
+    // for(int i=0; i<sm_exp->size(); i++){
+    //     for(int j=0; j<shape[axis]; j++){
 
-            int curr=i;
-            int idx=0;
-            for(int x=0; x<shape.size(); x++){
-                if(x==axis){
-                    idx+=j*strides[x];
-                } else {
-                    idx+=(curr/sm_exp->strides[x])*strides[x];
-                }
-                curr%=sm_exp->strides[x];
-            }
+    //         int curr=i;
+    //         int idx=0;
+    //         for(int x=0; x<shape.size(); x++){
+    //             if(x==axis){
+    //                 idx+=j*strides[x];
+    //             } else {
+    //                 idx+=(curr/sm_exp->strides[x])*strides[x];
+    //             }
+    //             curr%=sm_exp->strides[x];
+    //         }
 
-            sm_exp->at(i)+=exp(at(idx));
-        }
-    }
+    //         sm_exp->at(i)+=exp(at(idx));
+    //     }
+    // }
 
-    shared_ptr<Tensor> sm_exp_broadcast = sm_exp->broadcast(shape, false);
+    // shared_ptr<Tensor> sm_exp_broadcast = sm_exp->broadcast(shape, false);
 
-    // Softmax should return the same shape as input
+    // // Softmax should return the same shape as input
+    // shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+
+    // for(int i=0; i<result->size(); i++){
+    //     result->at(i)=exp(at(i))/sm_exp_broadcast->at(i);
+    // }
+
     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+    shared_ptr<Tensor> sm_exp_broadcast = make_shared<Tensor>(shape, false);
 
-    for(int i=0; i<result->size(); i++){
-        result->at(i)=exp(at(i))/sm_exp_broadcast->at(i);
-    }
+    launch_softmax(shared_from_this(), sm_exp, sm_exp_broadcast, result, axis);
 
 
     // // For each position in the result tensor
