@@ -13,16 +13,16 @@ struct TensorStruct {
     float* data;
     int data_size;
     size_t data_size_bytes;
-    bool cpu;
+    bool on_cpu;
     
     TensorStruct(){}
 
-    // Constructor that takes a tensor
-    TensorStruct(bool t_cpu=true){
-        cpu=t_cpu;
+    // Constructor that takes a bool
+    TensorStruct(bool t_on_cpu=false){
+        on_cpu=t_on_cpu;
     }
 
-    TensorStruct(shared_ptr<Tensor> t, bool t_cpu=true) {
+    TensorStruct(shared_ptr<Tensor> t, bool t_on_cpu=false) {
         shape_size = t->shape.size();
         shape_size_bytes = shape_size*sizeof(int);
         shape = new int[shape_size];
@@ -40,11 +40,11 @@ struct TensorStruct {
         data = t->data;
         data_size = t->size();
         data_size_bytes = data_size*sizeof(float);
-        cpu=t_cpu;
+        on_cpu=t_on_cpu;
     }
 
-    // Constructor that takes a tensor
-    TensorStruct(float* t_data, int t_data_size, vector<int>& t_shape, vector<int>& t_strides, bool t_cpu=true) {
+    // Constructor that takes raw data
+    TensorStruct(float* t_data, int t_data_size, vector<int>& t_shape, vector<int>& t_strides, bool t_on_cpu=false) {
         shape_size = t_shape.size();
         shape_size_bytes = shape_size*sizeof(int);
         shape = new int[shape_size];
@@ -62,19 +62,19 @@ struct TensorStruct {
         data = t_data;
         data_size = t_data_size;
         data_size_bytes = data_size*sizeof(float);
-        cpu=t_cpu;
+        on_cpu=t_on_cpu;
     }
     
     // Destructor to free memory
     ~TensorStruct() {
-        if(!cpu){
+        if(!on_cpu){
             return;
         }
-        printf("Destructor called\n");
+        printf("3 Destructor called\n");
         delete[] shape;
-        printf("Deleted shape\n");
+        printf("3 Deleted shape\n");
         delete[] strides;
-        printf("Deleted strides\n");
+        printf("3 Deleted strides\n");
     }
 
     // Unnecessary as long as the shape and strides for the tensor are unaffected by operation,
@@ -103,6 +103,14 @@ void cudaMemcpyTensorStruct(TensorStruct& targ, TensorStruct& src, cudaMemcpyKin
     cudaMemcpy(targ.shape, src.shape, src.shape_size_bytes, dir);
     cudaMemcpy(targ.strides, src.strides, src.strides_size_bytes, dir);
     cudaMemcpy(targ.data, src.data, src.data_size_bytes, dir);
+
+    // Copy scalar fields from b to a
+    targ.shape_size = src.shape_size;
+    targ.shape_size_bytes = src.shape_size_bytes;
+    targ.strides_size = src.strides_size;
+    targ.strides_size_bytes = src.strides_size_bytes;
+    targ.data_size = src.data_size;
+    targ.data_size_bytes = src.data_size_bytes;
 }
 
 void cudaFreeTensorStruct(TensorStruct t){
@@ -224,74 +232,23 @@ void launchDivide(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor>
 }
 
 // __global__ void broadcastKernel(float* a, float* b, int N){
-// // __global__ void broadcastKernel(TensorStruct a, TensorStruct b, bool matmul){
-//     int idx = threadIdx.x + blockIdx.x * blockDim.x;
-//     // printf("idx: %d\n", idx);
-
-//     if(idx>=N)return;
-
-//     b[idx] = 1.0;
-//     // int curr = idx;
-//     // int cnt = 0;
-//     // // printf("(%d) start for. b.shape_size: %d, matmul: %d\n", idx, b.shape_size, matmul);
-//     // for(int j=0; j<b.shape_size-2*matmul; j++) {
-//     //     // printf("(%d) iter\n", idx);
-//     //     // printf("(%d) b.strides: %d\n", idx, b.strides);
-//     //     // printf("(%d) b.strides[j]: %d\n", idx, b.strides[j]);
-//     //     int dim = curr/b.strides[j];
-//     //     // printf("(%d) dim: %d\n", idx, dim);
-//     //     curr %= b.strides[j];
-//     //     // printf("(%d) part a, a.shape_size: %d, j: %d\n", idx, a.shape_size, j);
-//     //     // printf("a.shape\n");
-//     //     // printf("a.shape[0]=%d\n", a.shape[0]);
-//     //     // for(int x=0; x<a.shape_size; x++){
-//     //     //     // printf("(%d) hi\n", idx);
-//     //     //     printf("(%d) a.shape[%d] = %d\n", idx, x, a.shape[x]);
-//     //     // }
-//     //     if(a.shape[j] == 1) {
-//     //         printf("(%d) part b\n", idx);
-//     //         cnt += 0;  // Don't add to index for broadcasted dimensions
-//     //     } else {
-//     //         printf("(%d) part c\n", idx);
-//     //         cnt += a.strides[j] * dim;
-//     //     }
-//     //     printf("(%d) done inner\n", idx);
-//     // }
-//     // printf("(%d) cnt=%d, a.data[cnt]=%f\n", idx, cnt, a.data[cnt]);
-//     // b.data[idx] = a.data[cnt];
-//     // printf("(%d) done, b.data[%d]=%f\n", idx, idx, b.data[idx]);
-// }
-__global__ void broadcastKernel(
-    int a_shape_size, 
-    int* a_shape,
-    int a_strides_size,
-    int* a_strides,
-    int a_data_size, 
-    float* a_data, 
-    int b_shape_size, 
-    int* b_shape,
-    int b_strides_size,
-    int* b_strides,
-    int b_data_size, 
-    float* b_data, 
-    bool matmul
-){
-// __global__ void broadcastKernel(TensorStruct a, TensorStruct b, bool matmul){
+__global__ void broadcastKernel(TensorStruct a, TensorStruct b, bool matmul){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     // printf("idx: %d\n", idx);
 
-    if(idx>=b_data_size)return;
+    if(idx>=b.data_size)return;
 
+    // b[idx] = 1.0;
     int curr = idx;
     int cnt = 0;
     // printf("(%d) start for. b.shape_size: %d, matmul: %d\n", idx, b.shape_size, matmul);
-    for(int j=0; j<b_shape_size-2*matmul; j++) {
+    for(int j=0; j<b.shape_size-2*matmul; j++) {
         // printf("(%d) iter\n", idx);
         // printf("(%d) b.strides: %d\n", idx, b.strides);
         // printf("(%d) b.strides[j]: %d\n", idx, b.strides[j]);
-        int dim = curr/b_strides[j];
+        int dim = curr/b.strides[j];
         // printf("(%d) dim: %d\n", idx, dim);
-        curr %= b_strides[j];
+        curr %= b.strides[j];
         // printf("(%d) part a, a.shape_size: %d, j: %d\n", idx, a.shape_size, j);
         // printf("a.shape\n");
         // printf("a.shape[0]=%d\n", a.shape[0]);
@@ -299,14 +256,65 @@ __global__ void broadcastKernel(
         //     // printf("(%d) hi\n", idx);
         //     printf("(%d) a.shape[%d] = %d\n", idx, x, a.shape[x]);
         // }
-        if(a_shape[j] == 1) {
+        if(a.shape[j] == 1) {
+            printf("(%d) part b\n", idx);
             cnt += 0;  // Don't add to index for broadcasted dimensions
         } else {
-            cnt += a_strides[j] * dim;
+            printf("(%d) part c\n", idx);
+            cnt += a.strides[j] * dim;
         }
+        printf("(%d) done inner\n", idx);
     }
-    b_data[idx] = a_data[cnt];
+    printf("(%d) cnt=%d, a.data[cnt]=%f\n", idx, cnt, a.data[cnt]);
+    b.data[idx] = a.data[cnt];
+    printf("(%d) done, b.data[%d]=%f\n", idx, idx, b.data[idx]);
 }
+// __global__ void broadcastKernel(
+//     int a_shape_size, 
+//     int* a_shape,
+//     int a_strides_size,
+//     int* a_strides,
+//     int a_data_size, 
+//     float* a_data, 
+//     int b_shape_size, 
+//     int* b_shape,
+//     int b_strides_size,
+//     int* b_strides,
+//     int b_data_size, 
+//     float* b_data, 
+//     bool matmul
+// ){
+// // __global__ void broadcastKernel(TensorStruct a, TensorStruct b, bool matmul){
+//     int idx = threadIdx.x + blockIdx.x * blockDim.x;
+//     // printf("idx: %d\n", idx);
+
+//     if(idx>=b_data_size)return;
+
+//     int curr = idx;
+//     int cnt = 0;
+//     // printf("(%d) start for. b.shape_size: %d, matmul: %d\n", idx, b.shape_size, matmul);
+//     for(int j=0; j<b_shape_size-2*matmul; j++) {
+//         // printf("(%d) iter\n", idx);
+//         // printf("(%d) b.strides: %d\n", idx, b.strides);
+//         // printf("(%d) b.strides[j]: %d\n", idx, b.strides[j]);
+//         int dim = curr/b_strides[j];
+//         // printf("(%d) dim: %d\n", idx, dim);
+//         curr %= b_strides[j];
+//         // printf("(%d) part a, a.shape_size: %d, j: %d\n", idx, a.shape_size, j);
+//         // printf("a.shape\n");
+//         // printf("a.shape[0]=%d\n", a.shape[0]);
+//         // for(int x=0; x<a.shape_size; x++){
+//         //     // printf("(%d) hi\n", idx);
+//         //     printf("(%d) a.shape[%d] = %d\n", idx, x, a.shape[x]);
+//         // }
+//         if(a_shape[j] == 1) {
+//             cnt += 0;  // Don't add to index for broadcasted dimensions
+//         } else {
+//             cnt += a_strides[j] * dim;
+//         }
+//     }
+//     b_data[idx] = a_data[cnt];
+// }
 
 void launchBroadcast(shared_ptr<Tensor>a, shared_ptr<Tensor>b, vector<int>& padded_shape, vector<int>& padded_strides, bool matmul){
     TensorStruct a_struct(a->data, a->size(), padded_shape, padded_strides);
@@ -317,63 +325,38 @@ void launchBroadcast(shared_ptr<Tensor>a, shared_ptr<Tensor>b, vector<int>& padd
     TensorStruct d_b_struct(false);
     printf("b");
     
-    // cudaMallocTensorStruct(d_a_struct, a_struct);
-    // cudaMallocTensorStruct(d_b_struct, b_struct);
-    
-    // Manual allocation for d_a_struct
-    cudaMalloc(&d_a_struct.shape, a_struct.shape_size_bytes);
-    cudaMalloc(&d_a_struct.strides, a_struct.strides_size_bytes);
-    cudaMalloc(&d_a_struct.data, a_struct.data_size_bytes);
-    
-    // Manual allocation for d_b_struct
-    cudaMalloc(&d_b_struct.shape, b_struct.shape_size_bytes);
-    cudaMalloc(&d_b_struct.strides, b_struct.strides_size_bytes);
-    cudaMalloc(&d_b_struct.data, b_struct.data_size_bytes);
+    cudaMallocTensorStruct(d_a_struct, a_struct);
+    cudaMallocTensorStruct(d_b_struct, b_struct);
     printf("c");
     
-    // Populate scalar fields in device-pointer structs (passed by value to kernel)
-    d_a_struct.shape_size = a_struct.shape_size;
-    d_a_struct.shape_size_bytes = a_struct.shape_size_bytes;
-    d_a_struct.strides_size = a_struct.strides_size;
-    d_a_struct.strides_size_bytes = a_struct.strides_size_bytes;
-    d_a_struct.data_size = a_struct.data_size;
-    d_a_struct.data_size_bytes = a_struct.data_size_bytes;
-
-    d_b_struct.shape_size = b_struct.shape_size;
-    d_b_struct.shape_size_bytes = b_struct.shape_size_bytes;
-    d_b_struct.strides_size = b_struct.strides_size;
-    d_b_struct.strides_size_bytes = b_struct.strides_size_bytes;
-    d_b_struct.data_size = b_struct.data_size;
-    d_b_struct.data_size_bytes = b_struct.data_size_bytes;
     
+    cudaMemcpyTensorStruct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
+    cudaMemcpyTensorStruct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
     
-    // cudaMemcpyTensorStruct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
-    // cudaMemcpyTensorStruct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+    // // Manual copy for a (data, shape, strides)
+    // cudaMemcpy(d_a_struct.data, a_struct.data, a_struct.data_size_bytes, cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_a_struct.shape, a_struct.shape, a_struct.shape_size_bytes, cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_a_struct.strides, a_struct.strides, a_struct.strides_size_bytes, cudaMemcpyHostToDevice);
     
-    // Manual copy for a (data, shape, strides)
-    cudaMemcpy(d_a_struct.data, a_struct.data, a_struct.data_size_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_a_struct.shape, a_struct.shape, a_struct.shape_size_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_a_struct.strides, a_struct.strides, a_struct.strides_size_bytes, cudaMemcpyHostToDevice);
+    // // Manual copy for b (ONLY shape and strides, NOT data)
+    // cudaMemcpy(d_b_struct.shape, b_struct.shape, b_struct.shape_size_bytes, cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_b_struct.strides, b_struct.strides, b_struct.strides_size_bytes, cudaMemcpyHostToDevice);
     
-    // Manual copy for b (ONLY shape and strides, NOT data)
-    cudaMemcpy(d_b_struct.shape, b_struct.shape, b_struct.shape_size_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b_struct.strides, b_struct.strides, b_struct.strides_size_bytes, cudaMemcpyHostToDevice);
-    
-    broadcastKernel<<<(N+255)/256, 256>>>(
-        d_a_struct.shape_size,
-        d_a_struct.shape,
-        d_a_struct.strides_size,
-        d_a_struct.strides,
-        d_a_struct.data_size,
-        d_a_struct.data, 
-        d_b_struct.shape_size,
-        d_b_struct.shape,
-        d_b_struct.strides_size,
-        d_b_struct.strides,
-        d_b_struct.data_size,
-        d_b_struct.data, 
-        matmul);
-    // broadcastKernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, matmul);
+    // broadcastKernel<<<(N+255)/256, 256>>>(
+    //     d_a_struct.shape_size,
+    //     d_a_struct.shape,
+    //     d_a_struct.strides_size,
+    //     d_a_struct.strides,
+    //     d_a_struct.data_size,
+    //     d_a_struct.data, 
+    //     d_b_struct.shape_size,
+    //     d_b_struct.shape,
+    //     d_b_struct.strides_size,
+    //     d_b_struct.strides,
+    //     d_b_struct.data_size,
+    //     d_b_struct.data, 
+    //     matmul);
+    broadcastKernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, matmul);
     printf("c2");
     cudaDeviceSynchronize();
     printf("c3");
@@ -383,17 +366,17 @@ void launchBroadcast(shared_ptr<Tensor>a, shared_ptr<Tensor>b, vector<int>& padd
     printf("d");
     
     printf("e");
-    // cudaFreeTensorStruct(d_a_struct);
-    // cudaFreeTensorStruct(d_b_struct);
+    cudaFreeTensorStruct(d_a_struct);
+    cudaFreeTensorStruct(d_b_struct);
     
-    // Manual cleanup for d_a_struct
-    cudaFree(d_a_struct.data);
-    cudaFree(d_a_struct.shape);
-    cudaFree(d_a_struct.strides);
+    // // Manual cleanup for d_a_struct
+    // cudaFree(d_a_struct.data);
+    // cudaFree(d_a_struct.shape);
+    // cudaFree(d_a_struct.strides);
     
-    // Manual cleanup for d_b_struct
-    cudaFree(d_b_struct.data);
-    cudaFree(d_b_struct.shape);
-    cudaFree(d_b_struct.strides);
+    // // Manual cleanup for d_b_struct
+    // cudaFree(d_b_struct.data);
+    // cudaFree(d_b_struct.shape);
+    // cudaFree(d_b_struct.strides);
     printf("f");
 }
