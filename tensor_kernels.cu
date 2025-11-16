@@ -319,3 +319,51 @@ void launch_sum(shared_ptr<Tensor>a, shared_ptr<Tensor>b, int axis){
     cuda_free_tensor_struct(d_a_struct);
     cuda_free_tensor_struct(d_b_struct);
 }
+
+__global__ void transpose_kernel(TensorStruct a, TensorStruct b, int dim1, int dim2){
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    if(idx>=b.data_size) return;
+
+    int ind=0;
+    int curr=idx;
+    int mag_dim1;
+    int mag_dim2;
+    for(int j=0; j<b.shape_size; j++){
+        if(j==dim1){
+            mag_dim1=curr/b.strides[j];
+        } else if(j==dim2){
+            mag_dim2=curr/b.strides[j];
+        }
+        ind+=(curr/b.strides[j])*a.strides[j];
+        curr%=b.strides[j];
+    }
+    ind-=mag_dim1*a.strides[dim1];
+    ind+=mag_dim2*a.strides[dim1];
+    ind+=mag_dim1*a.strides[dim2];
+    ind-=mag_dim2*a.strides[dim2];
+    b.data[idx]=a.data[ind];
+}
+
+void launch_transpose(shared_ptr<Tensor>a, shared_ptr<Tensor>b, int dim1, int dim2){
+    TensorStruct a_struct(a);
+    TensorStruct b_struct(b);
+    int N = b->size();
+
+    TensorStruct d_a_struct(false);
+    TensorStruct d_b_struct(false);
+    
+    cuda_malloc_tensor_struct(d_a_struct, a_struct);
+    cuda_malloc_tensor_struct(d_b_struct, b_struct);
+    
+    cuda_memcpy_tensor_struct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+
+    transpose_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, dim1, dim2);
+    cudaDeviceSynchronize();
+    
+    cuda_memcpy_tensor_struct(b_struct, d_b_struct, cudaMemcpyDeviceToHost);
+
+    cuda_free_tensor_struct(d_a_struct);
+    cuda_free_tensor_struct(d_b_struct);
+}

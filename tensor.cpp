@@ -879,26 +879,29 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad);
 
-    for(int i=0; i<result->size(); i++){
-        int ind=0;
-        int curr=i;
-        int mag_dim1;
-        int mag_dim2;
-        for(int j=0; j<new_shape.size(); j++){
-            if(j==dim1){
-                mag_dim1=curr/result->strides[j];
-            } else if(j==dim2){
-                mag_dim2=curr/result->strides[j];
-            }
-            ind+=(curr/result->strides[j])*strides[j];
-            curr%=result->strides[j];
-        }
-        ind-=mag_dim1*strides[dim1];
-        ind+=mag_dim2*strides[dim1];
-        ind+=mag_dim1*strides[dim2];
-        ind-=mag_dim2*strides[dim2];
-        result->at(i)=at(ind);
-    }
+    // CPU:
+    // for(int i=0; i<result->size(); i++){
+    //     int ind=0;
+    //     int curr=i;
+    //     int mag_dim1;
+    //     int mag_dim2;
+    //     for(int j=0; j<new_shape.size(); j++){
+    //         if(j==dim1){
+    //             mag_dim1=curr/result->strides[j];
+    //         } else if(j==dim2){
+    //             mag_dim2=curr/result->strides[j];
+    //         }
+    //         ind+=(curr/result->strides[j])*strides[j];
+    //         curr%=result->strides[j];
+    //     }
+    //     ind-=mag_dim1*strides[dim1];
+    //     ind+=mag_dim2*strides[dim1];
+    //     ind+=mag_dim1*strides[dim2];
+    //     ind-=mag_dim2*strides[dim2];
+    //     result->at(i)=at(ind);
+    // }
+
+    launch_transpose(shared_from_this(), result, dim1, dim2);
 
     if(requires_grad){
         result->parents.push_back(shared_from_this());
