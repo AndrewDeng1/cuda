@@ -1049,6 +1049,8 @@ shared_ptr<Tensor> Tensor::softmax(int axis) {
     shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, requires_grad);
 
     // CPU START:
+    // // TODO: Same with cuda version, when dtype becomes adjustable, will need diff way to get max value for dtype
+    // // TODO: Same with cuda version, should be getting max along axis and not across entire tensor, and then shifting based on max along each axis
     // float mx=-FLT_MAX;
     // for(int i=0; i<sm_exp->size(); i++){
     //     mx=std::max(mx, at(i));

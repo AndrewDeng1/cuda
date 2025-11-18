@@ -557,6 +557,7 @@ void launch_softmax(shared_ptr<Tensor>a, shared_ptr<Tensor>sm_exp, shared_ptr<Te
     int N = b->size();
 
     // TODO: When later make it possible to specify dtype, will have to change this code to get max value for that dtype
+    // TODO: Also technically should be finding the max value along each axis and shifting by the max value per axis, this is very lazy way but works ig?
     // Find max value in input tensor for numerical stability
     float max_val = -FLT_MAX;
     for(int i = 0; i < a->size(); i++){
