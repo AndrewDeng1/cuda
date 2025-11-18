@@ -1,5 +1,6 @@
 #include<iostream>
 #include<vector>
+#include<cfloat>
 #include "tensor.h"
 using namespace std;
 
@@ -518,7 +519,7 @@ void launch_tanh(shared_ptr<Tensor>a, shared_ptr<Tensor>b){
     cuda_free_tensor_struct(d_b_struct);
 }
 
-__global__ void sum_exp_kernel(TensorStruct a, TensorStruct b, int axis){
+__global__ void sum_exp_kernel(TensorStruct a, TensorStruct b, int axis, float shift = 0.0f){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     
     if(idx>=b.data_size) return;
@@ -536,16 +537,16 @@ __global__ void sum_exp_kernel(TensorStruct a, TensorStruct b, int axis){
             curr%=b.strides[x];
         }
 
-        b.data[idx]+=expf(a.data[a_idx]);
+        b.data[idx]+=expf(a.data[a_idx] - shift);
     }
 }
 
-__global__ void exp_kernel(TensorStruct a, TensorStruct b){
+__global__ void exp_kernel(TensorStruct a, TensorStruct b, float shift = 0.0f){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     
     if(idx>=b.data_size) return;
 
-    b.data[idx]=expf(a.data[idx]);
+    b.data[idx]=expf(a.data[idx] - shift);
 }
 
 void launch_softmax(shared_ptr<Tensor>a, shared_ptr<Tensor>sm_exp, shared_ptr<Tensor> sm_exp_broadcast, shared_ptr<Tensor>b, int axis){
@@ -554,6 +555,15 @@ void launch_softmax(shared_ptr<Tensor>a, shared_ptr<Tensor>sm_exp, shared_ptr<Te
     TensorStruct sm_exp_broadcast_struct(sm_exp_broadcast);
     TensorStruct b_struct(b);
     int N = b->size();
+
+    // TODO: When later make it possible to specify dtype, will have to change this code to get max value for that dtype
+    // Find max value in input tensor for numerical stability
+    float max_val = -FLT_MAX;
+    for(int i = 0; i < a->size(); i++){
+        if(a->data[i] > max_val){
+            max_val = a->data[i];
+        }
+    }
 
     TensorStruct d_a_struct(false);
     TensorStruct d_sm_exp_struct(false);
@@ -570,11 +580,11 @@ void launch_softmax(shared_ptr<Tensor>a, shared_ptr<Tensor>sm_exp, shared_ptr<Te
     cuda_memcpy_tensor_struct(d_sm_exp_broadcast_struct, sm_exp_broadcast_struct, cudaMemcpyHostToDevice);
     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
 
-    sum_exp_kernel<<<(sm_exp->size()+255)/256, 256>>>(d_a_struct, d_sm_exp_struct, axis);
+    sum_exp_kernel<<<(sm_exp->size()+255)/256, 256>>>(d_a_struct, d_sm_exp_struct, axis, max_val);
     cudaDeviceSynchronize();
     broadcast_kernel<<<(sm_exp_broadcast->size()+255)/256, 256>>>(d_sm_exp_struct, d_sm_exp_broadcast_struct, false);
     cudaDeviceSynchronize();
-    exp_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_a_struct);
+    exp_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_a_struct, max_val);
     cudaDeviceSynchronize();
     divide_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_sm_exp_broadcast_struct, d_b_struct);
     cudaDeviceSynchronize();

@@ -1,5 +1,6 @@
 #include "tensor.h"
 #include "tensor_kernels.h"
+#include <cfloat>
 
 Tensor::Tensor() : data(nullptr), grad(nullptr), parents(), backward_fn() {}
 
@@ -1047,7 +1048,12 @@ shared_ptr<Tensor> Tensor::softmax(int axis) {
 
     shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, requires_grad);
 
-    // CPU:
+    // CPU START:
+    // float mx=-FLT_MAX;
+    // for(int i=0; i<sm_exp->size(); i++){
+    //     mx=std::max(mx, at(i));
+    // }
+
     // for(int i=0; i<sm_exp->size(); i++){
     //     for(int j=0; j<shape[axis]; j++){
 
@@ -1062,9 +1068,10 @@ shared_ptr<Tensor> Tensor::softmax(int axis) {
     //             curr%=sm_exp->strides[x];
     //         }
 
-    //         sm_exp->at(i)+=exp(at(idx));
+    //         sm_exp->at(i)+=exp(at(idx)-mx);
     //     }
     // }
+    
 
     // shared_ptr<Tensor> sm_exp_broadcast = sm_exp->broadcast(shape, false);
 
@@ -1072,81 +1079,20 @@ shared_ptr<Tensor> Tensor::softmax(int axis) {
     // shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
 
     // for(int i=0; i<result->size(); i++){
-    //     result->at(i)=exp(at(i))/sm_exp_broadcast->at(i);
+    //     result->at(i)=exp(at(i)-mx)/sm_exp_broadcast->at(i);
     // }
+    // CPU END
 
     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
     shared_ptr<Tensor> sm_exp_broadcast = make_shared<Tensor>(shape, false);
 
     launch_softmax(shared_from_this(), sm_exp, sm_exp_broadcast, result, axis);
 
-
-    // // For each position in the result tensor
-    // for(int i=0; i<result->size(); i++){
-
-    //     // Convert linear index to multi-dimensional indices
-    //     int curr = i;
-    //     vector<int> indices(shape.size());
-    //     for(int x=shape.size()-1; x>=0; x--){
-    //         indices[x] = curr % shape[x];
-    //         curr /= shape[x];
-    //     }
-        
-    //     // Find the maximum value along the axis for numerical stability
-    //     double max_val = at(i);
-    //     for(int j=0; j<shape[axis]; j++){
-    //         // Create indices for the current element along the axis
-    //         vector<int> max_indices = indices;
-    //         max_indices[axis] = j;
-            
-    //         // Convert back to linear index
-    //         int max_idx = 0;
-    //         for(int x=0; x<shape.size(); x++){
-    //             max_idx += max_indices[x] * strides[x];
-    //         }
-            
-    //         max_val = std::max(max_val, (double)at(max_idx));
-    //     }
-        
-    //     // Calculate the sum of exp(x - max_val) for all elements along the specified axis
-    //     double sum_exp = 0.0;
-    //     for(int j=0; j<shape[axis]; j++){
-    //         // Create indices for the current element along the axis
-    //         vector<int> sum_indices = indices;
-    //         sum_indices[axis] = j;
-            
-    //         // Convert back to linear index
-    //         int sum_idx = 0;
-    //         for(int x=0; x<shape.size(); x++){
-    //             sum_idx += sum_indices[x] * strides[x];
-    //         }
-            
-    //         sum_exp += exp(at(sum_idx) - max_val);
-    //     }
-        
-    //     // Set the result: exp(x - max_val) / sum(exp(x - max_val))
-    //     result->at(i) = exp(at(i) - max_val) / sum_exp;
-    // }
-
     if(requires_grad){
         result->parents.push_back(shared_from_this());
         result->backward_fn = [this, result, axis]() {
-            // printf("Backward softmax\n");
-            // For softmax, the gradient is: grad_input = softmax * (grad_output - sum(grad_output * softmax))
-            
-            // // Compute the sum of grad_output * softmax along the axis
-            // auto grad_softmax_product = result->grad * result;
-            // auto grad_sum = grad_softmax_product->sum(axis, true);
-            
-            // // Compute the gradient: softmax * (grad_output - sum)
-            // auto grad_diff = result->grad - grad_sum->broadcast(shape, false);
-            // auto final_grad = result * grad_diff;
-            
-            // this->grad = this->grad + final_grad;
             auto dot = (result*result->grad)->sum(axis, true);
             this->grad += result*(result->grad-dot);
-            cout<<"gradient!"<<endl;
-            this->grad->print();
         };
     }
 
