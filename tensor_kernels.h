@@ -13,3 +13,4 @@ void launch_relu(shared_ptr<Tensor> a, shared_ptr<Tensor> b);
 void launch_sigmoid(shared_ptr<Tensor> a, shared_ptr<Tensor> b);
 void launch_tanh(shared_ptr<Tensor> a, shared_ptr<Tensor> b);
 void launch_softmax(shared_ptr<Tensor> a, shared_ptr<Tensor> sm_exp, shared_ptr<Tensor> sm_exp_broadcast, shared_ptr<Tensor> b, int axis);
+void launch_matmul(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> c);

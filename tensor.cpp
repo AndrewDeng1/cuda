@@ -802,42 +802,48 @@ shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>&
     matmul_output_shape.push_back(new_shape_B[new_shape_B.size()-1]);
 
     shared_ptr<Tensor> result = make_shared<Tensor>(matmul_output_shape, A->requires_grad||B->requires_grad);
-    for(int i=0; i<result->size(); i++){
-        int ind_A = 0;
-        int ind_B = 0;
-        int curr_A = i;
-        int curr_B = i;
+    
+    // --- CPU START ---
+    // for(int i=0; i<result->size(); i++){
+    //     int ind_A = 0;
+    //     int ind_B = 0;
+    //     int curr_A = i;
+    //     int curr_B = i;
 
-        // Gets you to dimension before 2D
-        for(int j=0; j<new_shape_A.size()-2; j++){
-            ind_A += (curr_A/result->strides[j])*new_A->strides[j];
-            curr_A%=result->strides[j];
-        }
+    //     // Gets you to dimension before 2D
+    //     for(int j=0; j<new_shape_A.size()-2; j++){
+    //         ind_A += (curr_A/result->strides[j])*new_A->strides[j];
+    //         curr_A%=result->strides[j];
+    //     }
 
-        // Get corresponding row
-        ind_A += (curr_A/result->strides[result->strides.size()-2])*new_A->strides[new_A->strides.size()-2];
+    //     // Get corresponding row
+    //     ind_A += (curr_A/result->strides[result->strides.size()-2])*new_A->strides[new_A->strides.size()-2];
         
-        // Ignore column
-        curr_A%=result->strides[result->strides.size()-1];
+    //     // Ignore column
+    //     curr_A%=result->strides[result->strides.size()-1];
         
-        // Gets you to dimension before 2D
-        for(int j=0; j<new_shape_B.size()-2; j++){
-            ind_B += (curr_B/result->strides[j])*new_B->strides[j];
-            curr_B%=result->strides[j];
-        }
+    //     // Gets you to dimension before 2D
+    //     for(int j=0; j<new_shape_B.size()-2; j++){
+    //         ind_B += (curr_B/result->strides[j])*new_B->strides[j];
+    //         curr_B%=result->strides[j];
+    //     }
 
-        // Ignore row
-        curr_B%=result->strides[result->strides.size()-2];
+    //     // Ignore row
+    //     curr_B%=result->strides[result->strides.size()-2];
         
-        // Get corresponding column
-        ind_B += (curr_B/result->strides[result->strides.size()-1])*new_B->strides[new_B->strides.size()-1];
+    //     // Get corresponding column
+    //     ind_B += (curr_B/result->strides[result->strides.size()-1])*new_B->strides[new_B->strides.size()-1];
         
-        for(int j=0; j<new_shape_A[new_shape_A.size()-1]; j++){
-            result->at(i) += new_A->at(ind_A)*new_B->at(ind_B);
-            ind_A += new_A->strides[new_A->strides.size()-1];
-            ind_B += new_B->strides[new_B->strides.size()-2];
-        }
-    }
+    //     for(int j=0; j<new_shape_A[new_shape_A.size()-1]; j++){
+    //         result->at(i) += new_A->at(ind_A)*new_B->at(ind_B);
+    //         ind_A += new_A->strides[new_A->strides.size()-1];
+    //         ind_B += new_B->strides[new_B->strides.size()-2];
+    //     }
+    // }
+    // --- CPU END ---
+
+    launch_matmul(new_A, new_B, result);
+    
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
         result->parents.push_back(new_B);

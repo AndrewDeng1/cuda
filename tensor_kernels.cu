@@ -597,3 +597,71 @@ void launch_softmax(shared_ptr<Tensor>a, shared_ptr<Tensor>sm_exp, shared_ptr<Te
     cuda_free_tensor_struct(d_sm_exp_broadcast_struct);
     cuda_free_tensor_struct(d_b_struct);
 }
+
+// TODO: Implement with tiling
+__global__ void matmul_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    int ind_A = 0;
+    int ind_B = 0;
+    int curr_A = idx;
+    int curr_B = idx;
+
+    // Gets you to dimension before 2D
+    for(int j=0; j<a.shape_size-2; j++){
+        ind_A += (curr_A/c.strides[j])*a.strides[j];
+        curr_A%=c.strides[j];
+    }
+
+    // Get corresponding row
+    ind_A += (curr_A/c.strides[c.strides_size-2])*a.strides[a.strides_size-2];
+    
+    // Ignore column
+    curr_A%=c.strides[c.strides_size-1];
+    
+    // Gets you to dimension before 2D
+    for(int j=0; j<b.shape_size-2; j++){
+        ind_B += (curr_B/c.strides[j])*b.strides[j];
+        curr_B%=c.strides[j];
+    }
+
+    // Ignore row
+    curr_B%=c.strides[c.strides_size-2];
+    
+    // Get corresponding column
+    ind_B += (curr_B/c.strides[c.strides_size-1])*b.strides[b.strides_size-1];
+    
+    for(int j=0; j<a.shape[a.shape_size-1]; j++){
+        c.data[idx] += a.data[ind_A]*b.data[ind_B];
+        ind_A += a.strides[a.strides_size-1];
+        ind_B += b.strides[b.strides_size-2];
+    }
+}
+
+void launch_matmul(shared_ptr<Tensor>a, shared_ptr<Tensor>b, shared_ptr<Tensor>c){
+    TensorStruct a_struct(a);
+    TensorStruct b_struct(b);
+    TensorStruct c_struct(c);
+    int N = c->size();
+
+    TensorStruct d_a_struct(false);
+    TensorStruct d_b_struct(false);
+    TensorStruct d_c_struct(false);
+    
+    cuda_malloc_tensor_struct(d_a_struct, a_struct);
+    cuda_malloc_tensor_struct(d_b_struct, b_struct);
+    cuda_malloc_tensor_struct(d_c_struct, c_struct);
+    
+    cuda_memcpy_tensor_struct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_c_struct, c_struct, cudaMemcpyHostToDevice);
+
+    matmul_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, d_c_struct);
+    cudaDeviceSynchronize();
+    
+    cuda_memcpy_tensor_struct(c_struct, d_c_struct, cudaMemcpyDeviceToHost);
+
+    cuda_free_tensor_struct(d_a_struct);
+    cuda_free_tensor_struct(d_b_struct);
+    cuda_free_tensor_struct(d_c_struct);
+}
