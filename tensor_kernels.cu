@@ -73,6 +73,8 @@ struct TensorStruct {
             return;
         }
 
+        printf("detor working\n");
+
         // Don't free data field because that holds same address as data field in original tensor
         delete[] shape;
         delete[] strides;
@@ -142,6 +144,7 @@ void launch_add(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> r
     
     cuda_memcpy_tensor_struct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_c_struct, c_struct, cudaMemcpyHostToDevice);
 
     add_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, d_c_struct);
     cudaDeviceSynchronize();
@@ -175,6 +178,7 @@ void launch_subtract(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tens
     
     cuda_memcpy_tensor_struct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_c_struct, c_struct, cudaMemcpyHostToDevice);
 
     subtract_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, d_c_struct);
     cudaDeviceSynchronize();
@@ -208,6 +212,7 @@ void launch_multiply(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tens
     
     cuda_memcpy_tensor_struct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_c_struct, c_struct, cudaMemcpyHostToDevice);
 
     multiply_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, d_c_struct);
     cudaDeviceSynchronize();
@@ -241,6 +246,7 @@ void launch_divide(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor
     
     cuda_memcpy_tensor_struct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_c_struct, c_struct, cudaMemcpyHostToDevice);
 
     divide_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, d_c_struct);
     cudaDeviceSynchronize();

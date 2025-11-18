@@ -6,6 +6,17 @@
         "initializer_list": "cpp",
         "utility": "cpp",
         "memory": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdint": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "exception": "cpp",
+        "new": "cpp",
+        "type_traits": "cpp",
+        "xtr1common": "cpp"
     }
 }

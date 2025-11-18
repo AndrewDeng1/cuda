@@ -305,6 +305,19 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
         throw std::runtime_error("Broadcast shape mismatch");
     }
 
+    bool same_shape=true;
+    for(int i=0; i<std::min(shape.size(), new_shape.size()); i++){
+        if(shape[i]!=new_shape[i]){
+            same_shape=false;
+            break;
+        }
+    }
+    if(shape.size()!=new_shape.size())same_shape=false;
+
+    if(same_shape){
+        return shared_from_this();
+    }
+
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
 
     // Create padded shape and strides
@@ -317,7 +330,7 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
         padded_strides.insert(padded_strides.begin(), 0);  // Stride of 0 for size-1 dimensions
     }
 
-    // // CPU:
+    // CPU:
     // for(int i=0; i<result->size(); i++) {
     //     int curr = i;
     //     int idx = 0;
@@ -452,7 +465,7 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
 
-    // // CPU:
+    // CPU:
     // for(int i=0; i<new_A->size(); i++){
     //     result->at(i) = new_A->at(i) - new_B->at(i);
     // }
@@ -490,7 +503,7 @@ shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
 
-    // // CPU:
+    // CPU:
     // for(int i=0; i<new_A->size(); i++){
     //     result->at(i) = new_A->at(i) * new_B->at(i);
     // }
