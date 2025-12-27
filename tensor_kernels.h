@@ -14,3 +14,4 @@ void launch_sigmoid(shared_ptr<Tensor> a, shared_ptr<Tensor> b);
 void launch_tanh(shared_ptr<Tensor> a, shared_ptr<Tensor> b);
 void launch_softmax(shared_ptr<Tensor> a, shared_ptr<Tensor> sm_exp, shared_ptr<Tensor> sm_exp_broadcast, shared_ptr<Tensor> b, int axis);
 void launch_matmul(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> c);
+void launch_cross_entropy(shared_ptr<Tensor> logits, shared_ptr<Tensor> y_true, shared_ptr<Tensor> result, int axis);

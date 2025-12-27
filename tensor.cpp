@@ -1206,51 +1206,54 @@ shared_ptr<Tensor> Tensor::cross_entropy(const shared_ptr<Tensor>& y_true, int a
 
     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
 
-    for(int i=0; i<result->size(); i++){
-        int c=-1;
+    // CPU:
+    // for(int i=0; i<result->size(); i++){
+    //     int c=-1;
         
-        // First pass: find max value along axis for numerical stability
-        float max_val = -FLT_MAX;
-        for(int j=0; j<shape[axis]; j++){
-            int curr=i;
-            int idx=0;
-            for(int x=0; x<shape.size(); x++){
-                if(x==axis){
-                    idx+=j*strides[x];
-                } else {
-                    idx+=(curr/result->strides[x])*strides[x];
-                }
-                curr%=result->strides[x];
-            }
-            max_val = std::max(max_val, at(idx));
-        }
+    //     // First pass: find max value along axis for numerical stability
+    //     float max_val = -FLT_MAX;
+    //     for(int j=0; j<shape[axis]; j++){
+    //         int curr=i;
+    //         int idx=0;
+    //         for(int x=0; x<shape.size(); x++){
+    //             if(x==axis){
+    //                 idx+=j*strides[x];
+    //             } else {
+    //                 idx+=(curr/result->strides[x])*strides[x];
+    //             }
+    //             curr%=result->strides[x];
+    //         }
+    //         max_val = std::max(max_val, at(idx));
+    //     }
 
-        // Second pass: compute sum of exp(x - max) and find correct class
-        for(int j=0; j<shape[axis]; j++){
+    //     // Second pass: compute sum of exp(x - max) and find correct class
+    //     for(int j=0; j<shape[axis]; j++){
 
-            int curr=i;
-            int idx=0;
-            for(int x=0; x<shape.size(); x++){
-                if(x==axis){
-                    idx+=j*strides[x];
-                } else {
-                    idx+=(curr/result->strides[x])*strides[x];
-                }
-                curr%=result->strides[x];
-            }
+    //         int curr=i;
+    //         int idx=0;
+    //         for(int x=0; x<shape.size(); x++){
+    //             if(x==axis){
+    //                 idx+=j*strides[x];
+    //             } else {
+    //                 idx+=(curr/result->strides[x])*strides[x];
+    //             }
+    //             curr%=result->strides[x];
+    //         }
 
-            result->at(i)+=exp(at(idx) - max_val);
+    //         result->at(i)+=exp(at(idx) - max_val);
 
-            if(abs(y_true->at(idx)-1.0f)<=1e-5f){
-                c=idx;
-            }
-        }
-        if(c==-1){
-            throw std::runtime_error("Invalid y_true. No '1' found in ground truth vector.");
-        }
-        // log(sum(exp(x - max))) + max - x[c] = log(sum(exp(x))) - x[c]
-        result->at(i)=log(result->at(i)+1e-9f) + max_val - at(c);
-    }
+    //         if(abs(y_true->at(idx)-1.0f)<=1e-5f){
+    //             c=idx;
+    //         }
+    //     }
+    //     if(c==-1){
+    //         throw std::runtime_error("Invalid y_true. No '1' found in ground truth vector.");
+    //     }
+    //     // log(sum(exp(x - max))) + max - x[c] = log(sum(exp(x))) - x[c]
+    //     result->at(i)=log(result->at(i)+1e-9f) + max_val - at(c);
+    // }
+
+    launch_cross_entropy(shared_from_this(), y_true, result, axis);
 
     if(requires_grad){
         result->parents.push_back(y_true);

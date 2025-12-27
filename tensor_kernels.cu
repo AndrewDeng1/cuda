@@ -665,3 +665,81 @@ void launch_matmul(shared_ptr<Tensor>a, shared_ptr<Tensor>b, shared_ptr<Tensor>c
     cuda_free_tensor_struct(d_b_struct);
     cuda_free_tensor_struct(d_c_struct);
 }
+
+__global__ void cross_entropy_kernel(TensorStruct logits, TensorStruct y_true, TensorStruct result, int axis){
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    if(idx >= result.data_size) return;
+
+    // First pass: find max value along axis for numerical stability
+    float max_val = -FLT_MAX;
+    for(int j=0; j<logits.shape[axis]; j++){
+        int curr = idx;
+        int logit_idx = 0;
+        for(int x=0; x<logits.shape_size; x++){
+            if(x == axis){
+                logit_idx += j * logits.strides[x];
+            } else {
+                logit_idx += (curr / result.strides[x]) * logits.strides[x];
+            }
+            curr %= result.strides[x];
+        }
+        if(logits.data[logit_idx] > max_val){
+            max_val = logits.data[logit_idx];
+        }
+    }
+
+    // Second pass: compute sum of exp(x - max) and find correct class
+    float sum_exp = 0.0f;
+    int correct_idx = -1;
+    for(int j=0; j<logits.shape[axis]; j++){
+        int curr = idx;
+        int logit_idx = 0;
+        for(int x=0; x<logits.shape_size; x++){
+            if(x == axis){
+                logit_idx += j * logits.strides[x];
+            } else {
+                logit_idx += (curr / result.strides[x]) * logits.strides[x];
+            }
+            curr %= result.strides[x];
+        }
+
+        sum_exp += expf(logits.data[logit_idx] - max_val);
+
+        // Check if this is the correct class (y_true == 1)
+        if(fabsf(y_true.data[logit_idx] - 1.0f) <= 1e-5f){
+            correct_idx = logit_idx;
+        }
+    }
+
+    // Compute cross entropy: log(sum_exp) + max - logit[correct_class]
+    result.data[idx] = logf(sum_exp + 1e-9f) + max_val - logits.data[correct_idx];
+}
+
+void launch_cross_entropy(shared_ptr<Tensor> logits, shared_ptr<Tensor> y_true, shared_ptr<Tensor> result, int axis){
+    TensorStruct logits_struct(logits);
+    TensorStruct y_true_struct(y_true);
+    TensorStruct result_struct(result);
+    int N = result->size();
+
+    TensorStruct d_logits_struct(false);
+    TensorStruct d_y_true_struct(false);
+    TensorStruct d_result_struct(false);
+    
+    cuda_malloc_tensor_struct(d_logits_struct, logits_struct);
+    cuda_malloc_tensor_struct(d_y_true_struct, y_true_struct);
+    cuda_malloc_tensor_struct(d_result_struct, result_struct);
+    
+    cuda_memcpy_tensor_struct(d_logits_struct, logits_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_y_true_struct, y_true_struct, cudaMemcpyHostToDevice);
+    cuda_memcpy_tensor_struct(d_result_struct, result_struct, cudaMemcpyHostToDevice);
+
+    cross_entropy_kernel<<<(N+255)/256, 256>>>(d_logits_struct, d_y_true_struct, d_result_struct, axis);
+    cudaDeviceSynchronize();
+    
+    cuda_memcpy_tensor_struct(result_struct, d_result_struct, cudaMemcpyDeviceToHost);
+
+    cuda_free_tensor_struct(d_logits_struct);
+    cuda_free_tensor_struct(d_y_true_struct);
+    cuda_free_tensor_struct(d_result_struct);
+}
