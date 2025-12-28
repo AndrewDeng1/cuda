@@ -1301,6 +1301,7 @@ shared_ptr<Tensor> Tensor::cross_entropy(const shared_ptr<Tensor>& y_true, int a
     return result;
 }
 
+// Note: Makes a copy, but pytorch implementation doesn't, it only changes view. Shouldn't raise too big of issues tho.
 shared_ptr<Tensor> Tensor::slice(int dim, int start, int end) {
     if(dim < 0) dim += shape.size();
     if(dim < 0 || dim >= shape.size()) {
