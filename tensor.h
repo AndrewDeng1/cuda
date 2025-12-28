@@ -36,9 +36,6 @@ class Tensor : public enable_shared_from_this<Tensor> {
         shared_ptr<Tensor> mean(int axis, bool keepdims=true);
         shared_ptr<Tensor> variance_squared(int axis, bool keepdims=true);
         shared_ptr<Tensor> pow(float exponent);
-        shared_ptr<Tensor> softmax(int axis);
-        // shared_ptr<Tensor> log_softmax(int axis, bool keepdims=true);
-        // shared_ptr<Tensor> negative_log_likelihood(const shared_ptr<Tensor>& y_true);
         shared_ptr<Tensor> cross_entropy(const shared_ptr<Tensor>& y_true, int axis, bool keepdims=true);
         shared_ptr<Tensor> slice(int dim, int start, int end);
         shared_ptr<Tensor> masked_fill(const shared_ptr<Tensor>& mask, float value);
@@ -84,6 +81,7 @@ shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>&
 shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A);
 shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A);
 shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A);
+shared_ptr<Tensor> softmax(const shared_ptr<Tensor>& A, int axis);
 shared_ptr<Tensor> dropout(const shared_ptr<Tensor>& A, float p = 0.5f, bool training = true);
 shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis);
 shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis = 0);

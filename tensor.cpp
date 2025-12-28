@@ -627,148 +627,6 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A) {
     return -1.0f * A;
 }
 
-// // Comparison operators
-// shared_ptr<Tensor> operator>(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
-//     if(!is_broadcastable(A->shape, B->shape, false)){
-//         throw invalid_argument("Shape mismatch");
-//     }
-
-//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
-
-//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
-//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
-    
-//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
-
-//     for(int i=0; i<new_A->size(); i++){
-//         result->at(i) = new_A->at(i) > new_B->at(i) ? 1.0f : 0.0f;
-//     }
-
-//     if(new_A->requires_grad || new_B->requires_grad){
-//         result->parents.push_back(new_A);
-//         result->parents.push_back(new_B);
-//         result->backward_fn = [](){
-//             throw runtime_error("Backward function for comparison operator '>' should not be called directly");
-//         };
-//     }
-
-//     return result;
-// }
-
-// shared_ptr<Tensor> operator<(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
-//     if(!is_broadcastable(A->shape, B->shape, false)){
-//         throw invalid_argument("Shape mismatch");
-//     }
-
-//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
-
-//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
-//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
-    
-//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
-
-//     for(int i=0; i<new_A->size(); i++){
-//         result->at(i) = new_A->at(i) < new_B->at(i) ? 1.0f : 0.0f;
-//     }
-
-//     if(new_A->requires_grad || new_B->requires_grad){
-//         result->parents.push_back(new_A);
-//         result->parents.push_back(new_B);
-//         result->backward_fn = [](){
-//             throw runtime_error("Backward function for comparison operator '<' should not be called directly");
-//         };
-//     }
-
-//     return result;
-// }
-
-// shared_ptr<Tensor> operator>=(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
-//     if(!is_broadcastable(A->shape, B->shape, false)){
-//         throw invalid_argument("Shape mismatch");
-//     }
-
-//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
-
-//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
-//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
-    
-//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
-
-//     for(int i=0; i<new_A->size(); i++){
-//         result->at(i) = new_A->at(i) >= new_B->at(i) ? 1.0f : 0.0f;
-//     }
-
-//     if(new_A->requires_grad || new_B->requires_grad){
-//         result->parents.push_back(new_A);
-//         result->parents.push_back(new_B);
-//         result->backward_fn = [](){
-//             throw runtime_error("Backward function for comparison operator '>=' should not be called directly");
-//         };
-//     }
-
-//     return result;
-// }
-
-// shared_ptr<Tensor> operator<=(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
-//     if(!is_broadcastable(A->shape, B->shape, false)){
-//         throw invalid_argument("Shape mismatch");
-//     }
-
-//     vector<int> new_shape = get_broadcast_shape(A->shape, B->shape, false);
-
-//     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
-//     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
-    
-//     shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad || B->requires_grad);
-
-//     for(int i=0; i<new_A->size(); i++){
-//         result->at(i) = new_A->at(i) <= new_B->at(i) ? 1.0f : 0.0f;
-//     }
-
-//     if(new_A->requires_grad || new_B->requires_grad){
-//         result->parents.push_back(new_A);
-//         result->parents.push_back(new_B);
-//         result->backward_fn = [](){
-//             throw runtime_error("Backward function for comparison operator '<=' should not be called directly");
-//         };
-//     }
-
-//     return result;
-// }
-
-// // Scalar comparison operators
-// shared_ptr<Tensor> operator>(const shared_ptr<Tensor>& A, float B) {
-//     return A > make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
-// }
-
-// shared_ptr<Tensor> operator>(float A, const shared_ptr<Tensor>& B) {
-//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) > B;
-// }
-
-// shared_ptr<Tensor> operator<(const shared_ptr<Tensor>& A, float B) {
-//     return A < make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
-// }
-
-// shared_ptr<Tensor> operator<(float A, const shared_ptr<Tensor>& B) {
-//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) < B;
-// }
-
-// shared_ptr<Tensor> operator>=(const shared_ptr<Tensor>& A, float B) {
-//     return A >= make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
-// }
-
-// shared_ptr<Tensor> operator>=(float A, const shared_ptr<Tensor>& B) {
-//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) >= B;
-// }
-
-// shared_ptr<Tensor> operator<=(const shared_ptr<Tensor>& A, float B) {
-//     return A <= make_shared<Tensor>(vector<int>{1}, vector<float>{B}, A->requires_grad);
-// }
-
-// shared_ptr<Tensor> operator<=(float A, const shared_ptr<Tensor>& B) {
-//     return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, B->requires_grad) <= B;
-// }
-
 shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B) {
     
     // is_broadcast should alr check this, but check anyways
@@ -1060,155 +918,77 @@ shared_ptr<Tensor> dropout(const shared_ptr<Tensor>& A, float p, bool training) 
 }
 
 // SOFTMAX
-shared_ptr<Tensor> Tensor::softmax(int axis) {
+shared_ptr<Tensor> softmax(const shared_ptr<Tensor>& A, int axis) {
     if(axis<0){
-        axis+=shape.size();
+        axis+=A->shape.size();
     }
-    if(axis>=shape.size()||axis<0){
+    if(axis>=(int)A->shape.size()||axis<0){
         throw std::runtime_error("Invalid axis");
     }
 
-    // Equivalent of sum along axis with keepdims=true, but sum of exp(at(i))
     vector<int> sm_exp_shape;
-    for(int i=0; i<shape.size(); i++){
+    for(int i=0; i<A->shape.size(); i++){
         if(i==axis){
             sm_exp_shape.push_back(1);
         } else {
-            sm_exp_shape.push_back(shape[i]);
+            sm_exp_shape.push_back(A->shape[i]);
         }
     }
 
-    shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, requires_grad);
+    shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, A->requires_grad);
 
     // CPU START:
     // // TODO: Same with cuda version, when dtype becomes adjustable, will need diff way to get max value for dtype
     // // TODO: Same with cuda version, should be getting max along axis and not across entire tensor, and then shifting based on max along each axis
     // float mx=-FLT_MAX;
     // for(int i=0; i<sm_exp->size(); i++){
-    //     mx=std::max(mx, at(i));
+    //     mx=std::max(mx, A->at(i));
     // }
 
     // for(int i=0; i<sm_exp->size(); i++){
-    //     for(int j=0; j<shape[axis]; j++){
+    //     for(int j=0; j<A->shape[axis]; j++){
 
     //         int curr=i;
     //         int idx=0;
-    //         for(int x=0; x<shape.size(); x++){
+    //         for(int x=0; x<A->shape.size(); x++){
     //             if(x==axis){
-    //                 idx+=j*strides[x];
+    //                 idx+=j*A->strides[x];
     //             } else {
-    //                 idx+=(curr/sm_exp->strides[x])*strides[x];
+    //                 idx+=(curr/sm_exp->strides[x])*A->strides[x];
     //             }
     //             curr%=sm_exp->strides[x];
     //         }
 
-    //         sm_exp->at(i)+=exp(at(idx)-mx);
+    //         sm_exp->at(i)+=exp(A->at(idx)-mx);
     //     }
     // }
     
 
-    // shared_ptr<Tensor> sm_exp_broadcast = sm_exp->broadcast(shape, false);
+    // shared_ptr<Tensor> sm_exp_broadcast = sm_exp->broadcast(A->shape, false);
 
     // // Softmax should return the same shape as input
-    // shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+    // shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
 
     // for(int i=0; i<result->size(); i++){
-    //     result->at(i)=exp(at(i)-mx)/sm_exp_broadcast->at(i);
+    //     result->at(i)=exp(A->at(i)-mx)/sm_exp_broadcast->at(i);
     // }
     // CPU END
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
-    shared_ptr<Tensor> sm_exp_broadcast = make_shared<Tensor>(shape, false);
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    shared_ptr<Tensor> sm_exp_broadcast = make_shared<Tensor>(A->shape, false);
 
-    launch_softmax(shared_from_this(), sm_exp, sm_exp_broadcast, result, axis);
+    launch_softmax(A, sm_exp, sm_exp_broadcast, result, axis);
 
-    if(requires_grad){
-        result->parents.push_back(shared_from_this());
-        result->backward_fn = [this, result, axis]() {
+    if(A->requires_grad){
+        result->parents.push_back(A);
+        result->backward_fn = [A, result, axis]() {
             auto dot = (result*result->grad)->sum(axis, true);
-            this->grad += result*(result->grad-dot);
+            A->grad += result*(result->grad-dot);
         };
     }
 
     return result;
 }
-
-// shared_ptr<Tensor> Tensor::log_softmax(int axis, bool keepdims) {
-//     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
-//     for(int i=0; i<result->size(); i++){
-//         // Convert linear index to multi-dimensional indices
-//         int curr = i;
-//         vector<int> indices(shape.size());
-//         for(int x=shape.size()-1; x>=0; x--){
-//             indices[x] = curr % shape[x];
-//             curr /= shape[x];
-//         }
-        
-//         // Find the maximum value along the axis for numerical stability
-//         double max_val = at(i);
-//         for(int j=0; j<shape[axis]; j++){
-//             // Create indices for the current element along the axis
-//             vector<int> max_indices = indices;
-//             max_indices[axis] = j;
-            
-//             // Convert back to linear index
-//             int max_idx = 0;
-//             for(int x=0; x<shape.size(); x++){
-//                 max_idx += max_indices[x] * strides[x];
-//             }
-            
-//             max_val = std::max(max_val, (double)at(max_idx));
-//         }
-        
-//         // Calculate the sum of exp(x - max_val) for all elements along the specified axis
-//         double sum_exp = 0.0;
-//         for(int j=0; j<shape[axis]; j++){
-//             // Create indices for the current element along the axis
-//             vector<int> sum_indices = indices;
-//             sum_indices[axis] = j;
-            
-//             // Convert back to linear index
-//             int sum_idx = 0;
-//             for(int x=0; x<shape.size(); x++){
-//                 sum_idx += sum_indices[x] * strides[x];
-//             }
-            
-//             sum_exp += exp(at(sum_idx) - max_val);
-//         }
-        
-//         // Set the result: log(exp(x - max_val) / sum(exp(x - max_val))) = (x - max_val) - log(sum_exp)
-//         result->at(i) = at(i) - max_val - log(sum_exp);
-//     }
-
-//     if(requires_grad){
-//         result->parents.push_back(shared_from_this());
-//         result->backward_fn = [this, result, axis]() {
-//             this->grad += result->grad - result->grad->sum(axis, true)->broadcast(shape, false);
-//         };
-//     }
-
-//     return result;
-// }
-
-// shared_ptr<Tensor> Tensor::negative_log_likelihood(const shared_ptr<Tensor>& y_true) {
-//     shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
-//     for(int i=0; i<result->size(); i++){
-//         result->at(i) = -log(at(i));
-//     }
-//     if(requires_grad){
-//         result->parents.push_back(y_true);
-//         result->parents.push_back(shared_from_this());
-//         result->backward_fn = [y_true, result, this](){
-//             if(y_true->requires_grad){
-//                 y_true->grad += result->grad;
-//             }
-//             if(requires_grad){
-//                 this->grad += result->grad;
-//             }
-//         };
-//     }
-//     return result;
-// }
 
 shared_ptr<Tensor> Tensor::cross_entropy(const shared_ptr<Tensor>& y_true, int axis, bool keepdims) {
     if(axis<0){
@@ -1285,7 +1065,7 @@ shared_ptr<Tensor> Tensor::cross_entropy(const shared_ptr<Tensor>& y_true, int a
         result->parents.push_back(y_true);
         result->parents.push_back(shared_from_this());
         result->backward_fn = [y_true, result, axis, this](){
-            this->grad+=shared_from_this()->softmax(axis)-y_true;
+            this->grad+=softmax(shared_from_this(), axis)-y_true;
 
             // ASSUMES y_true DOESN'T REQUIRE GRADIENT
             if(y_true->requires_grad){
