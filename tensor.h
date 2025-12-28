@@ -88,6 +88,7 @@ shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis);
 shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis = 0);
 shared_ptr<Tensor> tril(const shared_ptr<Tensor>& A, float fill_value = 0.0f, int diagonal = 0);
 shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon = 1e-5f);
+shared_ptr<Tensor> embedding(const shared_ptr<Tensor>& weight, const shared_ptr<Tensor>& indices);
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);

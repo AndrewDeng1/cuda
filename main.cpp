@@ -2,79 +2,132 @@
 #include <iostream>
 
 int main() {
-    cout << "===== STACK BASIC TEST (axis=0) =====" << endl;
-    auto a = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{1, 2, 3, 4, 5, 6}, true);
-    auto b = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{7, 8, 9, 10, 11, 12}, true);
+    cout << "===== EMBEDDING BASIC TEST =====" << endl;
+    auto weight = make_shared<Tensor>(vector<int>{5, 3}, vector<float>{
+        0, 1, 2,      // row 0
+        10, 11, 12,   // row 1
+        20, 21, 22,   // row 2
+        30, 31, 32,   // row 3
+        40, 41, 42    // row 4
+    }, true);
     
-    cout << "Tensor A (2x3):" << endl;
-    a->print();
-    cout << "Tensor B (2x3):" << endl;
-    b->print();
+    cout << "Embedding weight (5 x 3):" << endl;
+    weight->print();
     
-    auto s0 = stack({a, b}, 0);
-    cout << "stack([A, B], axis=0) -> (2, 2, 3):" << endl;
-    s0->print();
+    auto indices = make_shared<Tensor>(vector<int>{3}, vector<float>{0, 2, 4}, false);
+    auto out1 = embedding(weight, indices);
+    cout << "embedding(indices=[0, 2, 4]) -> (3, 3):" << endl;
+    out1->print();
 
-    cout << "\n===== STACK AXIS=1 =====" << endl;
-    auto s1 = stack({a, b}, 1);
-    cout << "stack([A, B], axis=1) -> (2, 2, 3):" << endl;
-    s1->print();
+    cout << "\n===== EMBEDDING WITH REPEATS =====" << endl;
+    auto indices2 = make_shared<Tensor>(vector<int>{4}, vector<float>{1, 1, 3, 1}, false);
+    auto out2 = embedding(weight, indices2);
+    cout << "embedding(indices=[1, 1, 3, 1]):" << endl;
+    out2->print();
 
-    cout << "\n===== STACK AXIS=2 (last) =====" << endl;
-    auto s2 = stack({a, b}, 2);
-    cout << "stack([A, B], axis=2) -> (2, 3, 2):" << endl;
-    s2->print();
+    cout << "\n===== EMBEDDING 2D INDICES (BATCHED) =====" << endl;
+    auto weight2 = make_shared<Tensor>(vector<int>{10, 4}, 0.0f, true);
+    for(int i = 0; i < 10; i++) {
+        for(int j = 0; j < 4; j++) {
+            weight2->at(i * 4 + j) = i * 10 + j;
+        }
+    }
+    cout << "Embedding weight (vocab=10, dim=4):" << endl;
+    weight2->print();
+    
+    // Batch of 2 sequences, each length 3
+    auto batch_indices = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{
+        0, 2, 4,   // sequence 1
+        1, 3, 5    // sequence 2
+    }, false);
+    cout << "Batch indices (2 x 3):" << endl;
+    batch_indices->print();
+    
+    auto out3 = embedding(weight2, batch_indices);
+    cout << "embedding(batch_indices) -> (2, 3, 4):" << endl;
+    out3->print();
 
-    cout << "\n===== STACK 3 TENSORS =====" << endl;
-    auto c = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{13, 14, 15, 16, 17, 18}, true);
-    auto s3 = stack({a, b, c}, 0);
-    cout << "stack([A, B, C], axis=0) -> (3, 2, 3):" << endl;
-    s3->print();
-
-    cout << "\n===== STACK 1D TENSORS =====" << endl;
-    auto x = make_shared<Tensor>(vector<int>{3}, vector<float>{1, 2, 3}, true);
-    auto y = make_shared<Tensor>(vector<int>{3}, vector<float>{4, 5, 6}, true);
-    auto z = make_shared<Tensor>(vector<int>{3}, vector<float>{7, 8, 9}, true);
+    cout << "\n===== EMBEDDING GRADIENT TEST =====" << endl;
+    auto weight3 = make_shared<Tensor>(vector<int>{4, 2}, vector<float>{
+        1, 2,    // row 0
+        3, 4,    // row 1
+        5, 6,    // row 2
+        7, 8     // row 3
+    }, true);
     
-    cout << "x, y, z are 1D tensors of length 3" << endl;
-    auto s4 = stack({x, y, z}, 0);
-    cout << "stack([x, y, z], axis=0) -> (3, 3):" << endl;
-    s4->print();
+    cout << "Weight (4 x 2):" << endl;
+    weight3->print();
     
-    auto s5 = stack({x, y, z}, 1);
-    cout << "stack([x, y, z], axis=1) -> (3, 3):" << endl;
-    s5->print();
-
-    cout << "\n===== STACK GRADIENT TEST =====" << endl;
-    auto p = make_shared<Tensor>(vector<int>{2, 2}, vector<float>{1, 2, 3, 4}, true);
-    auto q = make_shared<Tensor>(vector<int>{2, 2}, vector<float>{5, 6, 7, 8}, true);
+    auto indices4 = make_shared<Tensor>(vector<int>{3}, vector<float>{0, 2, 3}, false);
+    auto out4 = embedding(weight3, indices4);
+    cout << "embedding(indices=[0, 2, 3]):" << endl;
+    out4->print();
     
-    cout << "P:" << endl;
-    p->print();
-    cout << "Q:" << endl;
-    q->print();
-    
-    auto pq = stack({p, q}, 0);
-    cout << "stack([P, Q], axis=0) -> (2, 2, 2):" << endl;
-    pq->print();
-    
-    pq->grad = make_shared<Tensor>(vector<int>{2, 2, 2}, vector<float>{
-        10, 20, 30, 40,
-        50, 60, 70, 80
+    out4->grad = make_shared<Tensor>(vector<int>{3, 2}, vector<float>{
+        10, 20,   // grad for row 0
+        30, 40,   // grad for row 2
+        50, 60    // grad for row 3
     }, false);
     cout << "Upstream gradient:" << endl;
-    pq->grad->print();
+    out4->grad->print();
     
-    pq->backward();
-    cout << "P gradient:" << endl;
-    p->grad->print();
-    cout << "Q gradient:" << endl;
-    q->grad->print();
+    out4->backward();
+    cout << "Weight gradient (row 1 should be 0):" << endl;
+    weight3->grad->print();
 
-    cout << "\n===== STACK NEGATIVE AXIS =====" << endl;
-    auto s6 = stack({a, b}, -1);
-    cout << "stack([A, B], axis=-1) -> (2, 3, 2):" << endl;
-    s6->print();
+    cout << "\n===== EMBEDDING GRADIENT WITH REPEATS =====" << endl;
+    auto weight4 = make_shared<Tensor>(vector<int>{3, 2}, vector<float>{
+        1, 2,
+        3, 4,
+        5, 6
+    }, true);
+    
+    cout << "Weight (3 x 2):" << endl;
+    weight4->print();
+    
+    auto indices5 = make_shared<Tensor>(vector<int>{5}, vector<float>{0, 1, 0, 1, 0}, false);
+    auto out5 = embedding(weight4, indices5);
+    cout << "embedding(indices=[0, 1, 0, 1, 0]):" << endl;
+    out5->print();
+    
+    out5->grad = make_shared<Tensor>(vector<int>{5, 2}, vector<float>{
+        1, 1,    // row 0 first
+        2, 2,    // row 1 first
+        3, 3,    // row 0 second
+        4, 4,    // row 1 second
+        5, 5     // row 0 third
+    }, false);
+    cout << "Upstream gradient:" << endl;
+    out5->grad->print();
+    
+    out5->backward();
+    cout << "Weight gradient (row 0: 1+3+5=9, row 1: 2+4=6, row 2: 0):" << endl;
+    weight4->grad->print();
+
+    cout << "\n===== EMBEDDING 2D GRADIENT TEST =====" << endl;
+    auto weight5 = make_shared<Tensor>(vector<int>{4, 2}, vector<float>{
+        0, 1,
+        2, 3,
+        4, 5,
+        6, 7
+    }, true);
+    
+    auto batch_idx = make_shared<Tensor>(vector<int>{2, 2}, vector<float>{
+        0, 1,
+        2, 3
+    }, false);
+    
+    auto out6 = embedding(weight5, batch_idx);
+    cout << "embedding(2x2 indices) -> (2, 2, 2):" << endl;
+    out6->print();
+    
+    out6->grad = make_shared<Tensor>(vector<int>{2, 2, 2}, vector<float>{
+        10, 10,  20, 20,
+        30, 30,  40, 40
+    }, false);
+    out6->backward();
+    cout << "Weight gradient:" << endl;
+    weight5->grad->print();
 
     cout << "\n===== ALL TESTS COMPLETE =====" << endl;
     return 0;

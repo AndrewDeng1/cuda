@@ -1512,6 +1512,47 @@ shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tens
     return result;
 }
 
+shared_ptr<Tensor> embedding(const shared_ptr<Tensor>& weight, const shared_ptr<Tensor>& indices) {
+    if(weight->shape.size() != 2) {
+        throw std::runtime_error("Embedding weight must be 2D (vocab_size x embedding_dim)");
+    }
+    
+    int vocab_size = weight->shape[0];
+    int embed_dim = weight->shape[1];
+    
+    for(int i = 0; i < indices->size(); i++) {
+        int idx = (int)indices->at(i);
+        if(idx < 0 || idx >= vocab_size) {
+            throw std::runtime_error("Embedding index out of range");
+        }
+    }
+    
+    vector<int> result_shape = indices->shape;
+    result_shape.push_back(embed_dim);
+    shared_ptr<Tensor> result = make_shared<Tensor>(result_shape, weight->requires_grad);
+    
+    for(int idx = 0; idx < result->size(); idx++) {
+        int i = idx / embed_dim;
+        int j = idx % embed_dim;
+        int row = (int)indices->at(i);
+        result->at(idx) = weight->at(row * embed_dim + j);
+    }
+    
+    if(weight->requires_grad) {
+        result->parents.push_back(weight);
+        result->backward_fn = [weight, result, indices, embed_dim]() {
+            for(int idx = 0; idx < result->size(); idx++) {
+                int i = idx / embed_dim;
+                int j = idx % embed_dim;
+                int row = (int)indices->at(i);
+                weight->grad->at(row * embed_dim + j) += result->grad->at(idx);
+            }
+        };
+    }
+    
+    return result;
+}
+
 void Tensor::print() {
     // Helper function to print a single value with proper formatting
     auto print_value = [](float val) {
