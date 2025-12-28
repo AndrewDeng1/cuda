@@ -1,90 +1,39 @@
 #include "tensor.h"
 #include <iostream>
+#include <cassert>
 #include <cmath>
-#include <cfloat>
 
 int main() {
-    cout << "===== TRIL BASIC 2D TEST =====" << endl;
-    auto t1 = make_shared<Tensor>(vector<int>{4, 4}, vector<float>{
-        1, 2, 3, 4,
-        5, 6, 7, 8,
-        9, 10, 11, 12,
-        13, 14, 15, 16
-    }, true);
-    cout << "Original:" << endl;
-    t1->print();
-    
-    auto tl1 = tril(t1);
-    cout << "tril (lower triangular, fill=0):" << endl;
-    tl1->print();
+    cout << "===== TRIL BASIC TEST =====" << endl;
+    auto t1 = tril(4, 4);
+    assert(t1->at({0, 0}) == 1.0f);
+    assert(t1->at({0, 1}) == 0.0f);
+    assert(t1->at({1, 0}) == 1.0f);
+    assert(t1->at({1, 1}) == 1.0f);
+    assert(t1->at({3, 3}) == 1.0f);
+    assert(t1->at({0, 3}) == 0.0f);
+    cout << "PASSED" << endl;
 
-    cout << "\n===== TRIL WITH DIAGONAL OFFSET =====" << endl;
-    auto tl2 = tril(t1, 0.0f, 1);
-    cout << "tril(diagonal=1) - include 1 above main diagonal:" << endl;
-    tl2->print();
+    cout << "===== TRIL NON-SQUARE =====" << endl;
+    auto t2 = tril(3, 5);
+    assert(t2->shape[0] == 3 && t2->shape[1] == 5);
+    assert(t2->at({0, 0}) == 1.0f);
+    assert(t2->at({0, 1}) == 0.0f);
+    assert(t2->at({2, 2}) == 1.0f);
+    assert(t2->at({2, 4}) == 0.0f);
     
-    auto tl3 = tril(t1, 0.0f, -1);
-    cout << "tril(diagonal=-1) - exclude main diagonal:" << endl;
-    tl3->print();
+    auto t3 = tril(5, 3);
+    assert(t3->shape[0] == 5 && t3->shape[1] == 3);
+    assert(t3->at({4, 2}) == 1.0f);
+    assert(t3->at({0, 2}) == 0.0f);
+    cout << "PASSED" << endl;
 
-    cout << "\n===== TRIL FOR ATTENTION MASK (-inf) =====" << endl;
-    auto t2 = make_shared<Tensor>(vector<int>{3, 3}, 1.0f, true);
-    cout << "Original (all 1s):" << endl;
-    t2->print();
-    
-    auto mask = tril(t2, -INFINITY);
-    cout << "Attention mask (lower=1, upper=-inf):" << endl;
-    mask->print();
+    cout << "===== TRIL 1x1 =====" << endl;
+    auto t4 = tril(1, 1);
+    assert(t4->at(0) == 1.0f);
+    cout << "PASSED" << endl;
 
-    cout << "\n===== TRIL 3D (BATCHED) TEST =====" << endl;
-    auto t3 = make_shared<Tensor>(vector<int>{2, 3, 3}, vector<float>{
-        1, 2, 3,  4, 5, 6,  7, 8, 9,
-        10, 11, 12,  13, 14, 15,  16, 17, 18
-    }, true);
-    cout << "Original 2x3x3:" << endl;
-    t3->print();
-    
-    auto tl4 = tril(t3);
-    cout << "tril (batched):" << endl;
-    tl4->print();
-
-    cout << "\n===== TRIL 4D (BATCH x HEADS) TEST =====" << endl;
-    auto t4 = make_shared<Tensor>(vector<int>{2, 2, 3, 3}, vector<float>{
-        1,2,3, 4,5,6, 7,8,9,
-        1,2,3, 4,5,6, 7,8,9,
-        1,2,3, 4,5,6, 7,8,9,
-        1,2,3, 4,5,6, 7,8,9
-    }, true);
-    cout << "Original 2x2x3x3:" << endl;
-    t4->print();
-    
-    auto tl5 = tril(t4);
-    cout << "tril (4D batched):" << endl;
-    tl5->print();
-
-    cout << "\n===== TRIL GRADIENT TEST =====" << endl;
-    auto t5 = make_shared<Tensor>(vector<int>{3, 3}, vector<float>{
-        1, 2, 3,
-        4, 5, 6,
-        7, 8, 9
-    }, true);
-    cout << "Original:" << endl;
-    t5->print();
-    
-    auto tl6 = tril(t5);
-    cout << "tril:" << endl;
-    tl6->print();
-    
-    tl6->grad = make_shared<Tensor>(vector<int>{3, 3}, vector<float>{
-        10, 20, 30,
-        40, 50, 60,
-        70, 80, 90
-    }, false);
-    tl6->backward();
-    cout << "Gradient (should be 0 in upper triangle):" << endl;
-    t5->grad->print();
-
-    cout << "\n===== ALL TESTS COMPLETE =====" << endl;
+    cout << "===== ALL TRIL TESTS PASSED =====" << endl;
     return 0;
 }
 

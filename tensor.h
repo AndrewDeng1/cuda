@@ -41,6 +41,7 @@ class Tensor : public enable_shared_from_this<Tensor> {
         // shared_ptr<Tensor> negative_log_likelihood(const shared_ptr<Tensor>& y_true);
         shared_ptr<Tensor> cross_entropy(const shared_ptr<Tensor>& y_true, int axis, bool keepdims=true);
         shared_ptr<Tensor> slice(int dim, int start, int end);
+        shared_ptr<Tensor> masked_fill(const shared_ptr<Tensor>& mask, float value);
         void backward();
         void print();
 
@@ -86,9 +87,9 @@ shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A);
 shared_ptr<Tensor> dropout(const shared_ptr<Tensor>& A, float p = 0.5f, bool training = true);
 shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis);
 shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis = 0);
-shared_ptr<Tensor> tril(const shared_ptr<Tensor>& A, float fill_value = 0.0f, int diagonal = 0);
 shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon = 1e-5f);
 shared_ptr<Tensor> embedding(const shared_ptr<Tensor>& weight, const shared_ptr<Tensor>& indices);
+shared_ptr<Tensor> tril(int rows, int cols);
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);

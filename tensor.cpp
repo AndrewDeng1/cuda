@@ -1458,37 +1458,44 @@ shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis) {
     return cat(unsqueezed, axis);
 }
 
-shared_ptr<Tensor> tril(const shared_ptr<Tensor>& A, float fill_value, int diagonal) {
-    if(A->shape.size() < 2) {
-        throw std::runtime_error("tril requires at least 2 dimensions");
+shared_ptr<Tensor> Tensor::masked_fill(const shared_ptr<Tensor>& mask, float value) {
+    if(mask->size() != size()) {
+        throw std::runtime_error("Mask size must match tensor size");
     }
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
-    
-    int rows = A->shape[A->shape.size() - 2];
-    int cols = A->shape[A->shape.size() - 1];
+    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
     
     for(int idx = 0; idx < result->size(); idx++) {
-        int row = (idx / cols) % rows;
-        int col = idx % cols;
-        if(col <= row + diagonal) {
-            result->at(idx) = A->at(idx);
+        if(mask->at(idx) != 0.0f) {
+            result->at(idx) = value;
         } else {
-            result->at(idx) = fill_value;
+            result->at(idx) = at(idx);
         }
     }
     
-    if(A->requires_grad) {
-        result->parents.push_back(A);
-        result->backward_fn = [A, result, rows, cols, diagonal]() {
+    if(requires_grad) {
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [this, result, mask]() {
             for(int idx = 0; idx < result->size(); idx++) {
-                int row = (idx / cols) % rows;
-                int col = idx % cols;
-                if(col <= row + diagonal) {
-                    A->grad->at(idx) += result->grad->at(idx);
+                if(mask->at(idx) == 0.0f) {
+                    this->grad->at(idx) += result->grad->at(idx);
                 }
             }
         };
+    }
+    
+    return result;
+}
+
+shared_ptr<Tensor> tril(int rows, int cols) {
+    shared_ptr<Tensor> result = make_shared<Tensor>(vector<int>{rows, cols}, 0.0f, false);
+    
+    for(int idx = 0; idx < result->size(); idx++) {
+        int row = idx / cols;
+        int col = idx % cols;
+        if(col <= row) {
+            result->at(idx) = 1.0f;
+        }
     }
     
     return result;

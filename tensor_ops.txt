@@ -14,5 +14,7 @@ LogSoftmax,
 NegativeLogLikelihood,
 - LayerNorm,
 - Softmax,
-Dropout,
-EmbeddingLookup
+- Dropout,
+- EmbeddingLookup
+- cross entropy
+- masked fill
