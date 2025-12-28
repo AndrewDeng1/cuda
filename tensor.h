@@ -92,6 +92,7 @@ shared_ptr<Tensor> embedding(const shared_ptr<Tensor>& weight, const shared_ptr<
 shared_ptr<Tensor> tril(int rows, int cols);
 shared_ptr<Tensor> arange(float start, float end, float step = 1.0f);
 shared_ptr<Tensor> multinomial(const shared_ptr<Tensor>& probs, int num_samples, bool replacement = false);
+shared_ptr<Tensor> randint(int low, int high, const vector<int>& shape);
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);

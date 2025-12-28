@@ -1544,6 +1544,18 @@ shared_ptr<Tensor> multinomial(const shared_ptr<Tensor>& probs, int num_samples,
     return result;
 }
 
+shared_ptr<Tensor> randint(int low, int high, const vector<int>& shape) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dist(low, high - 1);
+    
+    shared_ptr<Tensor> result = make_shared<Tensor>(shape, 0.0f, false);
+    for(int i = 0; i < result->size(); i++) {
+        result->at(i) = (float)dist(gen);
+    }
+    return result;
+}
+
 shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon) {
     int axis = A->shape.size() - 1;
     int norm_size = A->shape[axis];
