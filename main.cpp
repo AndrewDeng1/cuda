@@ -2,6 +2,7 @@
 #include <iostream>
 
 int main() {
+    cout<<"test2"<<endl;
     cout << "===== SOFTMAX TEST =====" << endl;
     auto input = make_shared<Tensor>(
         vector<int>{2, 3},
