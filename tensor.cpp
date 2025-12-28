@@ -1301,6 +1301,124 @@ shared_ptr<Tensor> Tensor::cross_entropy(const shared_ptr<Tensor>& y_true, int a
     return result;
 }
 
+shared_ptr<Tensor> Tensor::slice(int dim, int start, int end) {
+    if(dim < 0) dim += shape.size();
+    if(dim < 0 || dim >= shape.size()) {
+        throw std::runtime_error("Invalid dimension for slice");
+    }
+    if(start < 0) start += shape[dim];
+    if(end < 0) end += shape[dim];
+    if(start < 0 || end > shape[dim] || start >= end) {
+        throw std::runtime_error("Invalid slice indices");
+    }
+    
+    vector<int> new_shape = shape;
+    new_shape[dim] = end - start;
+    
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+    
+    for(int i = 0; i < result->size(); i++) {
+        int curr = i;
+        vector<int> indices(new_shape.size());
+        for(int j = new_shape.size() - 1; j >= 0; j--) {
+            indices[j] = curr % new_shape[j];
+            curr /= new_shape[j];
+        }
+        indices[dim] += start;
+        result->at(i) = at(indices);
+    }
+    
+    if(requires_grad) {
+        result->parents.push_back(shared_from_this());
+        result->backward_fn = [this, result, dim, start]() {
+            for(int i = 0; i < result->size(); i++) {
+                int curr = i;
+                vector<int> indices(result->shape.size());
+                for(int j = result->shape.size() - 1; j >= 0; j--) {
+                    indices[j] = curr % result->shape[j];
+                    curr /= result->shape[j];
+                }
+                indices[dim] += start;
+                int orig_idx = 0;
+                for(int j = 0; j < indices.size(); j++) {
+                    orig_idx += indices[j] * this->strides[j];
+                }
+                this->grad->at(orig_idx) += result->grad->at(i);
+            }
+        };
+    }
+    
+    return result;
+}
+
+shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis) {
+    if(tensors.empty()) {
+        throw std::runtime_error("Cannot concatenate empty tensor list");
+    }
+    
+    if(axis < 0) axis += tensors[0]->shape.size();
+    if(axis < 0 || axis >= tensors[0]->shape.size()) {
+        throw std::runtime_error("Invalid axis for cat");
+    }
+    
+    vector<int> base_shape = tensors[0]->shape;
+    int total_dim = 0;
+    bool any_requires_grad = false;
+    
+    for(const auto& t : tensors) {
+        if(t->shape.size() != base_shape.size()) {
+            throw std::runtime_error("All tensors must have same number of dimensions");
+        }
+        for(int i = 0; i < base_shape.size(); i++) {
+            if(i != axis && t->shape[i] != base_shape[i]) {
+                throw std::runtime_error("Tensor shapes must match except on concat axis");
+            }
+        }
+        total_dim += t->shape[axis];
+        if(t->requires_grad) any_requires_grad = true;
+    }
+    
+    vector<int> new_shape = base_shape;
+    new_shape[axis] = total_dim;
+    
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, any_requires_grad);
+    
+    int offset = 0;
+    for(const auto& t : tensors) {
+        for(int i = 0; i < t->size(); i++) {
+            int curr = i;
+            vector<int> indices(t->shape.size());
+            for(int j = t->shape.size() - 1; j >= 0; j--) {
+                indices[j] = curr % t->shape[j];
+                curr /= t->shape[j];
+            }
+            indices[axis] += offset;
+            result->at(indices) = t->at(i);
+        }
+        offset += t->shape[axis];
+    }
+    
+    if(any_requires_grad) {
+        for(const auto& t : tensors) {
+            result->parents.push_back(t);
+        }
+        result->backward_fn = [tensors, result, axis]() {
+            int offset = 0;
+            for(const auto& t : tensors) {
+                if(t->requires_grad) {
+                    auto sliced_grad = result->grad->slice(axis, offset, offset + t->shape[axis]);
+                    for(int i = 0; i < t->size(); i++) {
+                        t->grad->at(i) += sliced_grad->at(i);
+                    }
+                }
+                offset += t->shape[axis];
+            }
+        };
+    }
+    
+    return result;
+}
+
 void Tensor::print() {
     // Helper function to print a single value with proper formatting
     auto print_value = [](float val) {
