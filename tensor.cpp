@@ -1420,6 +1420,42 @@ shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis) {
     return result;
 }
 
+shared_ptr<Tensor> tril(const shared_ptr<Tensor>& A, float fill_value, int diagonal) {
+    if(A->shape.size() < 2) {
+        throw std::runtime_error("tril requires at least 2 dimensions");
+    }
+    
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    
+    int rows = A->shape[A->shape.size() - 2];
+    int cols = A->shape[A->shape.size() - 1];
+    
+    for(int idx = 0; idx < result->size(); idx++) {
+        int row = (idx / cols) % rows;
+        int col = idx % cols;
+        if(col <= row + diagonal) {
+            result->at(idx) = A->at(idx);
+        } else {
+            result->at(idx) = fill_value;
+        }
+    }
+    
+    if(A->requires_grad) {
+        result->parents.push_back(A);
+        result->backward_fn = [A, result, rows, cols, diagonal]() {
+            for(int idx = 0; idx < result->size(); idx++) {
+                int row = (idx / cols) % rows;
+                int col = idx % cols;
+                if(col <= row + diagonal) {
+                    A->grad->at(idx) += result->grad->at(idx);
+                }
+            }
+        };
+    }
+    
+    return result;
+}
+
 void Tensor::print() {
     // Helper function to print a single value with proper formatting
     auto print_value = [](float val) {
