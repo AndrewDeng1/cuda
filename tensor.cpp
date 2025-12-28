@@ -1501,6 +1501,49 @@ shared_ptr<Tensor> tril(int rows, int cols) {
     return result;
 }
 
+shared_ptr<Tensor> arange(float start, float end, float step) {
+    if(step == 0.0f) {
+        throw std::runtime_error("arange step cannot be zero");
+    }
+    int n = (int)ceil((end - start) / step);
+    if(n <= 0) n = 0;
+    
+    shared_ptr<Tensor> result = make_shared<Tensor>(vector<int>{n}, 0.0f, false);
+    for(int i = 0; i < n; i++) {
+        result->at(i) = start + i * step;
+    }
+    return result;
+}
+
+shared_ptr<Tensor> multinomial(const shared_ptr<Tensor>& probs, int num_samples, bool replacement) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    
+    int num_classes = probs->shape.back();
+    int num_distributions = probs->size() / num_classes;
+    
+    if(!replacement && num_samples > num_classes) {
+        throw std::runtime_error("cannot sample more than num_classes without replacement");
+    }
+    
+    vector<int> result_shape = probs->shape;
+    result_shape.back() = num_samples;
+    shared_ptr<Tensor> result = make_shared<Tensor>(result_shape, 0.0f, false);
+    
+    for(int d = 0; d < num_distributions; d++) {
+        vector<float> weights(probs->data + d * num_classes, probs->data + (d + 1) * num_classes);
+        
+        for(int s = 0; s < num_samples; s++) {
+            std::discrete_distribution<int> dist(weights.begin(), weights.end());
+            int idx = dist(gen);
+            if(!replacement) weights[idx] = 0.0f;
+            result->at(d * num_samples + s) = (float)idx;
+        }
+    }
+    
+    return result;
+}
+
 shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon) {
     int axis = A->shape.size() - 1;
     int norm_size = A->shape[axis];

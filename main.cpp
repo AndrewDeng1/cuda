@@ -1,89 +1,67 @@
 #include "tensor.h"
 #include <iostream>
 #include <cmath>
-#include <cfloat>
+#include <set>
 
 int main() {
-    cout << "===== TRIL BASIC TEST =====" << endl;
-    auto t1 = tril(4, 4);
-    cout << "tril(4, 4) - lower triangular 1s, upper 0s:" << endl;
-    t1->print();
-
-    cout << "\n===== TRIL NON-SQUARE =====" << endl;
-    auto t2 = tril(3, 5);
-    cout << "tril(3, 5):" << endl;
-    t2->print();
+    cout << "===== ARANGE BASIC TEST =====" << endl;
+    auto a1 = arange(0, 5, 1);
+    cout << "arange(0, 5, 1):" << endl;
+    a1->print();
     
-    auto t3 = tril(5, 3);
-    cout << "tril(5, 3):" << endl;
-    t3->print();
+    auto a2 = arange(1, 10, 2);
+    cout << "arange(1, 10, 2):" << endl;
+    a2->print();
+    
+    auto a3 = arange(0.0f, 1.0f, 0.25f);
+    cout << "arange(0, 1, 0.25):" << endl;
+    a3->print();
 
-    cout << "\n===== MASKED_FILL BASIC TEST =====" << endl;
-    auto tensor = make_shared<Tensor>(vector<int>{3, 3}, vector<float>{
-        1, 2, 3,
-        4, 5, 6,
-        7, 8, 9
-    }, true);
-    auto mask = make_shared<Tensor>(vector<int>{3, 3}, vector<float>{
-        0, 1, 1,
-        0, 0, 1,
-        0, 0, 0
+    cout << "\n===== ARANGE NEGATIVE STEP =====" << endl;
+    auto a4 = arange(5, 0, -1);
+    cout << "arange(5, 0, -1):" << endl;
+    a4->print();
+
+    cout << "\n===== MULTINOMIAL 1D =====" << endl;
+    auto probs = make_shared<Tensor>(vector<int>{4}, vector<float>{0.1f, 0.2f, 0.3f, 0.4f}, false);
+    cout << "Probs: ";
+    probs->print();
+    
+    cout << "5 samples with replacement:" << endl;
+    for(int i = 0; i < 3; i++) {
+        auto samples = multinomial(probs, 5, true);
+        samples->print();
+    }
+
+    cout << "\n===== MULTINOMIAL WITHOUT REPLACEMENT =====" << endl;
+    cout << "4 samples without replacement (should be all unique each time):" << endl;
+    for(int i = 0; i < 3; i++) {
+        auto samples = multinomial(probs, 4, false);
+        samples->print();
+        std::set<int> unique;
+        for(int j = 0; j < 4; j++) {
+            unique.insert((int)samples->at(j));
+        }
+        cout << "Unique count: " << unique.size() << endl;
+    }
+
+    cout << "\n===== MULTINOMIAL 2D BATCHED =====" << endl;
+    auto probs2d = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{
+        0.5f, 0.3f, 0.2f,
+        0.1f, 0.1f, 0.8f
     }, false);
+    cout << "Probs:" << endl;
+    probs2d->print();
     
-    cout << "Input:" << endl;
-    tensor->print();
-    cout << "Mask (1=fill, 0=keep):" << endl;
-    mask->print();
-    
-    auto out1 = tensor->masked_fill(mask, -999.0f);
-    cout << "masked_fill(mask, -999):" << endl;
-    out1->print();
+    auto samples2d = multinomial(probs2d, 2, true);
+    cout << "Samples shape: " << samples2d->shape[0] << "x" << samples2d->shape[1] << endl;
+    samples2d->print();
 
-    cout << "\n===== ATTENTION MASK PATTERN =====" << endl;
-    auto scores = make_shared<Tensor>(vector<int>{4, 4}, vector<float>{
-        1, 2, 3, 4,
-        5, 6, 7, 8,
-        9, 10, 11, 12,
-        13, 14, 15, 16
-    }, true);
-    cout << "Attention scores:" << endl;
-    scores->print();
-    
-    // Create upper triangular mask (inverse of tril)
-    auto tril_mask = tril(4, 4);
-    auto ones = make_shared<Tensor>(vector<int>{4, 4}, 1.0f, false);
-    auto upper_mask = ones - tril_mask;  // 1s in upper triangle
-    cout << "Upper triangle mask (1 - tril):" << endl;
-    upper_mask->print();
-    
-    auto masked_scores = scores->masked_fill(upper_mask, -INFINITY);
-    cout << "Masked scores (upper=-inf):" << endl;
-    masked_scores->print();
-
-    cout << "\n===== MASKED_FILL GRADIENT TEST =====" << endl;
-    auto t4 = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{
-        1, 2, 3,
-        4, 5, 6
-    }, true);
-    auto m4 = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{
-        0, 1, 0,
-        1, 0, 0
-    }, false);
-    
-    cout << "Input:" << endl;
-    t4->print();
-    
-    auto out4 = t4->masked_fill(m4, -100.0f);
-    cout << "masked_fill:" << endl;
-    out4->print();
-    
-    out4->grad = make_shared<Tensor>(vector<int>{2, 3}, vector<float>{
-        10, 20, 30,
-        40, 50, 60
-    }, false);
-    out4->backward();
-    cout << "Gradient (0 where masked):" << endl;
-    t4->grad->print();
+    cout << "\n===== MULTINOMIAL DETERMINISTIC =====" << endl;
+    auto det_probs = make_shared<Tensor>(vector<int>{4}, vector<float>{0.0f, 0.0f, 1.0f, 0.0f}, false);
+    cout << "Probs [0, 0, 1, 0] - should always sample index 2:" << endl;
+    auto det_samples = multinomial(det_probs, 5, true);
+    det_samples->print();
 
     cout << "\n===== ALL TESTS COMPLETE =====" << endl;
     return 0;
