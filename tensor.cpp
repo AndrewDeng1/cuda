@@ -1,6 +1,7 @@
 #include "tensor.h"
 #include "tensor_kernels.h"
 #include <cfloat>
+#include <random>
 
 Tensor::Tensor() : data(nullptr), grad(nullptr), parents(), backward_fn() {}
 
@@ -1028,6 +1029,36 @@ shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
         result->parents.push_back(A);
         result->backward_fn = [A, result](){
             A->grad += result->grad*(1.0f-result*result);
+        };
+    }
+    return result;
+}
+
+shared_ptr<Tensor> dropout(const shared_ptr<Tensor>& A, float p, bool training) {
+    shared_ptr<Tensor> mask = make_shared<Tensor>(A->shape, false);
+    
+    // Generate mask on CPU
+    if(!training || p == 0.0f) {
+        for(int i = 0; i < mask->size(); i++) {
+            mask->at(i) = 1.0f;
+        }
+    } else {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::bernoulli_distribution dist(1.0 - p);
+        float scale = 1.0f / (1.0f - p);
+        
+        for(int i = 0; i < mask->size(); i++) {
+            mask->at(i) = dist(gen) ? scale : 0.0f;
+        }
+    }
+
+    shared_ptr<Tensor> result = A * mask;
+    
+    if(A->requires_grad) {
+        result->parents.push_back(A);
+        result->backward_fn = [A, result, mask]() {
+            A->grad += result->grad * mask;
         };
     }
     return result;
