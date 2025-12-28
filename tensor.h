@@ -85,6 +85,7 @@ shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A);
 shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A);
 shared_ptr<Tensor> dropout(const shared_ptr<Tensor>& A, float p = 0.5f, bool training = true);
 shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis);
+shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis = 0);
 shared_ptr<Tensor> tril(const shared_ptr<Tensor>& A, float fill_value = 0.0f, int diagonal = 0);
 shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon = 1e-5f);
 

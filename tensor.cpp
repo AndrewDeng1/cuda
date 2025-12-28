@@ -1415,6 +1415,49 @@ shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis) {
     return result;
 }
 
+shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis) {
+    if(tensors.empty()) {
+        throw std::runtime_error("Cannot stack empty tensor list");
+    }
+    
+    vector<int> base_shape = tensors[0]->shape;
+    int ndim = base_shape.size();
+    
+    if(axis < 0) axis += ndim + 1;
+    if(axis < 0 || axis > ndim) {
+        throw std::runtime_error("Invalid axis for stack");
+    }
+    
+    for(const auto& t : tensors) {
+        if(t->shape.size() != base_shape.size()) {
+            throw std::runtime_error("All tensors must have same number of dimensions");
+        }
+        for(int i = 0; i < base_shape.size(); i++) {
+            if(t->shape[i] != base_shape[i]) {
+                throw std::runtime_error("All tensors must have same shape");
+            }
+        }
+    }
+    
+    vector<shared_ptr<Tensor>> unsqueezed;
+    for(const auto& t : tensors) {
+        vector<int> new_shape;
+        for(int i = 0; i < ndim + 1; i++) {
+            if(i == axis) {
+                new_shape.push_back(1);
+            }
+            if(i < axis) {
+                new_shape.push_back(t->shape[i]);
+            } else if(i > axis) {
+                new_shape.push_back(t->shape[i - 1]);
+            }
+        }
+        unsqueezed.push_back(t->reshape(new_shape));
+    }
+    
+    return cat(unsqueezed, axis);
+}
+
 shared_ptr<Tensor> tril(const shared_ptr<Tensor>& A, float fill_value, int diagonal) {
     if(A->shape.size() < 2) {
         throw std::runtime_error("tril requires at least 2 dimensions");
