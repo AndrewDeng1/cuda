@@ -966,11 +966,6 @@ shared_ptr<Tensor> Tensor::variance_squared(int axis, bool keepdims) {
     return centered_squared->mean(axis, keepdims);
 }
 
-shared_ptr<Tensor> Tensor::norm(int axis, bool keepdims) {
-    shared_ptr<Tensor> epsilon = make_shared<Tensor>(shape, 1e-5f, false);
-    return (shared_from_this()-mean(axis, keepdims)->broadcast(shape, false))/(variance_squared(axis, keepdims)+epsilon)->pow(0.5f);
-}
-
 shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A) {
     shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
     
@@ -1452,6 +1447,24 @@ shared_ptr<Tensor> tril(const shared_ptr<Tensor>& A, float fill_value, int diago
             }
         };
     }
+    
+    return result;
+}
+
+shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon) {
+    int axis = A->shape.size() - 1;
+    int norm_size = A->shape[axis];
+    
+    if(gamma->size() != norm_size || beta->size() != norm_size) {
+        throw std::runtime_error("gamma and beta must match last dimension size");
+    }
+    
+    auto mean = A->mean(axis, true);
+    auto var = A->variance_squared(axis, true);
+    auto eps = make_shared<Tensor>(var->shape, epsilon, false);
+    auto std_inv = (var + eps)->pow(-0.5f);
+    auto x_norm = (A - mean->broadcast(A->shape)) * std_inv->broadcast(A->shape);
+    auto result = x_norm * gamma->broadcast(A->shape) + beta->broadcast(A->shape);
     
     return result;
 }
