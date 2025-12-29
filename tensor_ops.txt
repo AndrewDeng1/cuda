@@ -18,3 +18,25 @@ NegativeLogLikelihood,
 - EmbeddingLookup
 - cross entropy
 - masked fill
+
+todo:
+
+- Enable user not needing to use shared_ptr
+    - make Tensor class that wraps shared pointer to TensorImpl, then change all tensor operations 
+to work with this (good enough for now)
+    - make TensorImpl wrap shared pointer to Storage class, which stores data, bytes, etc.
+    - add "offset" to TensorImpl
+    - make AutogradMeta to store parents, backward function
+
+- Enable any dtype precision, can specify by tensor?
+
+- Figure out how weights are stored for open weight models, and how to load them
+
+- Get optimizer working
+- Get nn.Module and all layers working
+- Get gpt.py working
+
+tmr:
+- TensorImpl
+- Figure out how nn.Module nn.Parameters optimizer gonna work
+- Implement gpt.py w library
