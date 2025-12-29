@@ -37,6 +37,7 @@ to work with this (good enough for now)
 - Get gpt.py working
 
 tmr:
+- Add DeviceType field to Tensor object
 - TensorImpl
 - Figure out how nn.Module nn.Parameters optimizer gonna work
 - Implement gpt.py w library

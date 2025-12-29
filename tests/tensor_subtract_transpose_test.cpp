@@ -113,7 +113,7 @@ int main() {
     a5->print();
     a5->grad = make_shared<Tensor>(vector<int>{2, 3, 3}, vector<float>{1000.0f, 2000.0f, 3000.0f, 4000.0f, 5000.0f, 6000.0f, 7000.0f, 8000.0f, 9000.0f, 10000.0f, 11000.0f, 12000.0f, 13000.0f, 14000.0f, 15000.0f, 16000.0f, 17000.0f, 18000.0f}, true);
     a5->grad->print();
-    a5->backward_fn();
+    a5->backward();
     a3->grad->print();
     a4->grad->print();
 
@@ -145,7 +145,7 @@ int main() {
     auto a8 = a7-a6;
     a8->print();
     a8->grad = make_shared<Tensor>(vector<int>{1, 1, 2, 3}, vector<float>{1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}, true);
-    a8->backward_fn();
+    a8->backward();
     a6->grad->print();
     a7->grad->print();
 
@@ -153,7 +153,7 @@ int main() {
     auto a9 = a8->transpose(-2, -1);
     a9->print();
     a9->grad = make_shared<Tensor>(vector<int>{1, 1, 3, 2}, vector<float>{10.0f, 10.0f, 10.0f, 10.0f, 10.0f, 10.0f}, true);
-    a9->backward_fn();
+    a9->backward();
     a8->grad->print();
 }
 

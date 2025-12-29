@@ -3,19 +3,20 @@
 #include <cfloat>
 #include <random>
 
-Tensor::Tensor() : data(nullptr), grad(nullptr), parents(), backward_fn() {}
+Tensor::Tensor() : data(nullptr), grad(nullptr), parents(), backward_fn(), device(DeviceType::CUDA) {}
 
-Tensor::Tensor(const vector<int>& shape, bool requires_grad) : shape(shape), requires_grad(requires_grad) {
+Tensor::Tensor(const vector<int>& shape, bool requires_grad, DeviceType device) : shape(shape), requires_grad(requires_grad), device(device) {
     
     this->requires_grad = requires_grad;
     this->shape = shape;
+    this->device = device;
     
     this->strides = compute_strides(shape);
 
     this->data = new float[size()]();  // Changed from int to float
 
     if(requires_grad) {
-        this->grad = make_shared<Tensor>(shape, false);
+        this->grad = make_shared<Tensor>(shape, false, device);
     } else {
         this->grad = nullptr;
     }
@@ -24,7 +25,7 @@ Tensor::Tensor(const vector<int>& shape, bool requires_grad) : shape(shape), req
     this->backward_fn = [](){};
 }
 
-Tensor::Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad) : Tensor(shape, requires_grad) {
+Tensor::Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad, DeviceType device) : Tensor(shape, requires_grad, device) {
     
     if(data.size()!=size()){
         throw std::runtime_error("Data size mismatch");
@@ -35,19 +36,19 @@ Tensor::Tensor(const vector<int>& shape, const vector<float>& data, bool require
     }
 }
 
-Tensor::Tensor(const vector<int>& shape, float* data, bool requires_grad) : Tensor(shape, requires_grad) {
+Tensor::Tensor(const vector<int>& shape, float* data, bool requires_grad, DeviceType device) : Tensor(shape, requires_grad, device) {
     for(int i=0; i<size(); i++){
         this->data[i] = data[i];
     }
 }
 
-Tensor::Tensor(const vector<int>& shape, float num, bool requires_grad) : Tensor(shape, requires_grad) {
+Tensor::Tensor(const vector<int>& shape, float num, bool requires_grad, DeviceType device) : Tensor(shape, requires_grad, device) {
     for(int i=0; i<size(); i++){
         this->data[i] = num;
     }
 }
 
-Tensor::Tensor(shared_ptr<Tensor> other) : Tensor(other->shape, other->data, other->requires_grad) {
+Tensor::Tensor(shared_ptr<Tensor> other) : Tensor(other->shape, other->data, other->requires_grad, other->device) {
 
     // if(requires_grad){
     //     this->grad = make_shared<Tensor>(other->grad);
@@ -121,7 +122,7 @@ std::shared_ptr<Tensor> Tensor::reshape(const std::vector<int>& new_shape) {
         throw std::runtime_error("Reshape size mismatch");
     }
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad, device);
 
     if(requires_grad) {
         result->parents.push_back(shared_from_this());
@@ -211,28 +212,30 @@ shared_ptr<Tensor> Tensor::sum(int axis, bool keepdims) {
         }
     }
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad, device);
 
-    // CPU:
-    // for(int i=0; i<result->size(); i++){
-    //     for(int j=0; j<shape[axis]; j++){
+    if(device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++){
+            for(int j=0; j<shape[axis]; j++){
 
-    //         int curr=i;
-    //         int idx=0;
-    //         for(int x=0; x<shape.size(); x++){
-    //             if(x==axis){
-    //                 idx+=j*strides[x];
-    //             } else {
-    //                 idx+=(curr/result->strides[x])*strides[x];
-    //             }
-    //             curr%=result->strides[x];
-    //         }
+                int curr=i;
+                int idx=0;
+                for(int x=0; x<shape.size(); x++){
+                    if(x==axis){
+                        idx+=j*strides[x];
+                    } else {
+                        idx+=(curr/result->strides[x])*strides[x];
+                    }
+                    curr%=result->strides[x];
+                }
 
-    //         result->at(i)+=at(idx);
-    //     }
-    // }
-
-    launch_sum(shared_from_this(), result, axis);
+                result->at(i)+=at(idx);
+            }
+        }
+    } else {
+        launch_sum(shared_from_this(), result, axis);
+    }
 
     if(requires_grad){
         result->parents.push_back(shared_from_this());
@@ -320,7 +323,7 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
         return shared_from_this();
     }
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad, device);
 
     // Create padded shape and strides
     vector<int> padded_shape = shape;
@@ -332,24 +335,26 @@ shared_ptr<Tensor> Tensor::broadcast(const vector<int>& new_shape, bool matmul) 
         padded_strides.insert(padded_strides.begin(), 0);  // Stride of 0 for size-1 dimensions
     }
 
-    // CPU:
-    // for(int i=0; i<result->size(); i++) {
-    //     int curr = i;
-    //     int idx = 0;
-    //     for(int j=0; j<new_shape.size()-2*matmul; j++) {
-    //         int dim = curr/result->strides[j];
-    //         curr %= result->strides[j];
-            
-    //         if(padded_shape[j] == 1) {
-    //             idx += 0;  // Don't add to index for broadcasted dimensions
-    //         } else {
-    //             idx += padded_strides[j] * dim;
-    //         }
-    //     }
-    //     result->at(i) = at(idx);
-    // }
-
-    launch_broadcast(shared_from_this(), result, padded_shape, padded_strides, matmul);
+    if(device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++) {
+            int curr = i;
+            int idx = 0;
+            for(int j=0; j<new_shape.size()-2*matmul; j++) {
+                int dim = curr/result->strides[j];
+                curr %= result->strides[j];
+                
+                if(padded_shape[j] == 1) {
+                    idx += 0;  // Don't add to index for broadcasted dimensions
+                } else {
+                    idx += padded_strides[j] * dim;
+                }
+            }
+            result->at(i) = at(idx);
+        }
+    } else {
+        launch_broadcast(shared_from_this(), result, padded_shape, padded_strides, matmul);
+    }
 
     if(requires_grad) {
         result->parents.push_back(shared_from_this());
@@ -426,14 +431,16 @@ shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
         throw std::runtime_error("Broadcast size mismatch");
     }
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad, A->device);
 
-    // CPU:
-    // for(int i=0; i<new_A->size(); i++){
-    //     result->at(i) = new_A->at(i) + new_B->at(i);
-    // }
-
-    launch_add(new_A, new_B, result);
+    if(A->device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<new_A->size(); i++){
+            result->at(i) = new_A->at(i) + new_B->at(i);
+        }
+    } else {
+        launch_add(new_A, new_B, result);
+    }
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -465,14 +472,16 @@ shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad, A->device);
 
-    // CPU:
-    // for(int i=0; i<new_A->size(); i++){
-    //     result->at(i) = new_A->at(i) - new_B->at(i);
-    // }
-
-    launch_subtract(new_A, new_B, result);
+    if(A->device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<new_A->size(); i++){
+            result->at(i) = new_A->at(i) - new_B->at(i);
+        }
+    } else {
+        launch_subtract(new_A, new_B, result);
+    }
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -503,14 +512,16 @@ shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad, A->device);
 
-    // CPU:
-    // for(int i=0; i<new_A->size(); i++){
-    //     result->at(i) = new_A->at(i) * new_B->at(i);
-    // }
-
-    launch_multiply(new_A, new_B, result);
+    if(A->device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<new_A->size(); i++){
+            result->at(i) = new_A->at(i) * new_B->at(i);
+        }
+    } else {
+        launch_multiply(new_A, new_B, result);
+    }
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -540,14 +551,16 @@ shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, const shared_ptr<Tenso
     shared_ptr<Tensor> new_A = A->broadcast(new_shape, false);
     shared_ptr<Tensor> new_B = B->broadcast(new_shape, false);
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, A->requires_grad||B->requires_grad, A->device);
 
-    // CPU:
-    // for(int i=0; i<new_A->size(); i++){
-    //     result->at(i) = new_A->at(i) / new_B->at(i);
-    // }
-
-    launch_divide(new_A, new_B, result);
+    if(A->device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<new_A->size(); i++){
+            result->at(i) = new_A->at(i) / new_B->at(i);
+        }
+    } else {
+        launch_divide(new_A, new_B, result);
+    }
 
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -592,35 +605,35 @@ shared_ptr<Tensor>& operator/=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& 
 }
 
 shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, float B) {
-    return A + make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+    return A + make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true, A->device);
 }
 
 shared_ptr<Tensor> operator+(float A, const shared_ptr<Tensor>& B) {
-    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) + B;
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true, B->device) + B;
 }
 
 shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, float B) {
-    return A - make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+    return A - make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true, A->device);
 }
 
 shared_ptr<Tensor> operator-(float A, const shared_ptr<Tensor>& B) {
-    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) - B;
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true, B->device) - B;
 }
 
 shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, float B) {
-    return A * make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+    return A * make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true, A->device);
 }
 
 shared_ptr<Tensor> operator*(float A, const shared_ptr<Tensor>& B) {
-    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) * B;
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true, B->device) * B;
 }
 
 shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, float B) {
-    return A / make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true);
+    return A / make_shared<Tensor>(vector<int>{1}, vector<float>{B}, true, A->device);
 }
 
 shared_ptr<Tensor> operator/(float A, const shared_ptr<Tensor>& B) {
-    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true) / B;
+    return make_shared<Tensor>(vector<int>{1}, vector<float>{A}, true, B->device) / B;
 }
 
 shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A) {
@@ -660,48 +673,50 @@ shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>&
     matmul_output_shape.push_back(new_shape_A[new_shape_A.size()-2]);
     matmul_output_shape.push_back(new_shape_B[new_shape_B.size()-1]);
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(matmul_output_shape, A->requires_grad||B->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(matmul_output_shape, A->requires_grad||B->requires_grad, A->device);
     
-    // --- CPU START ---
-    // for(int i=0; i<result->size(); i++){
-    //     int ind_A = 0;
-    //     int ind_B = 0;
-    //     int curr_A = i;
-    //     int curr_B = i;
+    if(A->device == DeviceType::CPU) {
+        // --- CPU START ---
+        for(int i=0; i<result->size(); i++){
+            int ind_A = 0;
+            int ind_B = 0;
+            int curr_A = i;
+            int curr_B = i;
 
-    //     // Gets you to dimension before 2D
-    //     for(int j=0; j<new_shape_A.size()-2; j++){
-    //         ind_A += (curr_A/result->strides[j])*new_A->strides[j];
-    //         curr_A%=result->strides[j];
-    //     }
+            // Gets you to dimension before 2D
+            for(int j=0; j<new_shape_A.size()-2; j++){
+                ind_A += (curr_A/result->strides[j])*new_A->strides[j];
+                curr_A%=result->strides[j];
+            }
 
-    //     // Get corresponding row
-    //     ind_A += (curr_A/result->strides[result->strides.size()-2])*new_A->strides[new_A->strides.size()-2];
-        
-    //     // Ignore column
-    //     curr_A%=result->strides[result->strides.size()-1];
-        
-    //     // Gets you to dimension before 2D
-    //     for(int j=0; j<new_shape_B.size()-2; j++){
-    //         ind_B += (curr_B/result->strides[j])*new_B->strides[j];
-    //         curr_B%=result->strides[j];
-    //     }
+            // Get corresponding row
+            ind_A += (curr_A/result->strides[result->strides.size()-2])*new_A->strides[new_A->strides.size()-2];
+            
+            // Ignore column
+            curr_A%=result->strides[result->strides.size()-1];
+            
+            // Gets you to dimension before 2D
+            for(int j=0; j<new_shape_B.size()-2; j++){
+                ind_B += (curr_B/result->strides[j])*new_B->strides[j];
+                curr_B%=result->strides[j];
+            }
 
-    //     // Ignore row
-    //     curr_B%=result->strides[result->strides.size()-2];
-        
-    //     // Get corresponding column
-    //     ind_B += (curr_B/result->strides[result->strides.size()-1])*new_B->strides[new_B->strides.size()-1];
-        
-    //     for(int j=0; j<new_shape_A[new_shape_A.size()-1]; j++){
-    //         result->at(i) += new_A->at(ind_A)*new_B->at(ind_B);
-    //         ind_A += new_A->strides[new_A->strides.size()-1];
-    //         ind_B += new_B->strides[new_B->strides.size()-2];
-    //     }
-    // }
-    // --- CPU END ---
-
-    launch_matmul(new_A, new_B, result);
+            // Ignore row
+            curr_B%=result->strides[result->strides.size()-2];
+            
+            // Get corresponding column
+            ind_B += (curr_B/result->strides[result->strides.size()-1])*new_B->strides[new_B->strides.size()-1];
+            
+            for(int j=0; j<new_shape_A[new_shape_A.size()-1]; j++){
+                result->at(i) += new_A->at(ind_A)*new_B->at(ind_B);
+                ind_A += new_A->strides[new_A->strides.size()-1];
+                ind_B += new_B->strides[new_B->strides.size()-2];
+            }
+        }
+        // --- CPU END ---
+    } else {
+        launch_matmul(new_A, new_B, result);
+    }
     
     if(new_A->requires_grad || new_B->requires_grad){
         result->parents.push_back(new_A);
@@ -756,31 +771,33 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
     vector<int> new_shape(shape);
     swap(new_shape[dim1], new_shape[dim2]);
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, data, requires_grad, device);
 
-    // CPU:
-    // for(int i=0; i<result->size(); i++){
-    //     int ind=0;
-    //     int curr=i;
-    //     int mag_dim1;
-    //     int mag_dim2;
-    //     for(int j=0; j<new_shape.size(); j++){
-    //         if(j==dim1){
-    //             mag_dim1=curr/result->strides[j];
-    //         } else if(j==dim2){
-    //             mag_dim2=curr/result->strides[j];
-    //         }
-    //         ind+=(curr/result->strides[j])*strides[j];
-    //         curr%=result->strides[j];
-    //     }
-    //     ind-=mag_dim1*strides[dim1];
-    //     ind+=mag_dim2*strides[dim1];
-    //     ind+=mag_dim1*strides[dim2];
-    //     ind-=mag_dim2*strides[dim2];
-    //     result->at(i)=at(ind);
-    // }
-
-    launch_transpose(shared_from_this(), result, dim1, dim2);
+    if(device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++){
+            int ind=0;
+            int curr=i;
+            int mag_dim1;
+            int mag_dim2;
+            for(int j=0; j<new_shape.size(); j++){
+                if(j==dim1){
+                    mag_dim1=curr/result->strides[j];
+                } else if(j==dim2){
+                    mag_dim2=curr/result->strides[j];
+                }
+                ind+=(curr/result->strides[j])*strides[j];
+                curr%=result->strides[j];
+            }
+            ind-=mag_dim1*strides[dim1];
+            ind+=mag_dim2*strides[dim1];
+            ind+=mag_dim1*strides[dim2];
+            ind-=mag_dim2*strides[dim2];
+            result->at(i)=at(ind);
+        }
+    } else {
+        launch_transpose(shared_from_this(), result, dim1, dim2);
+    }
 
     if(requires_grad){
         result->parents.push_back(shared_from_this());
@@ -795,14 +812,16 @@ shared_ptr<Tensor> Tensor::transpose(int dim1, int dim2) {
 }
 
 shared_ptr<Tensor> Tensor::pow(float exponent) {
-    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad, device);
     
-    // CPU:
-    // for(int i=0; i<result->size(); i++){
-    //     result->at(i) = std::pow(at(i), exponent);
-    // }
-
-    launch_pow(shared_from_this(), result, exponent);
+    if(device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++){
+            result->at(i) = std::pow(at(i), exponent);
+        }
+    } else {
+        launch_pow(shared_from_this(), result, exponent);
+    }
 
     if(requires_grad){
         result->parents.push_back(shared_from_this());
@@ -825,21 +844,23 @@ shared_ptr<Tensor> Tensor::variance_squared(int axis, bool keepdims) {
 }
 
 shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A) {
-    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad, A->device);
     
-    // CPU:
-    // for(int i=0; i<result->size(); i++){
-    //     result->at(i) = std::max(0.0f, A->at(i));
-    // }
-
-    launch_relu(A, result);
+    if(A->device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++){
+            result->at(i) = std::max(0.0f, A->at(i));
+        }
+    } else {
+        launch_relu(A, result);
+    }
 
     if(A->requires_grad){
         result->parents.push_back(A);
         result->backward_fn = [A, result](){
             // For ReLU, we need to compute the gradient mask without using comparison operators
             // since they don't have backward functions
-            auto grad_mask = make_shared<Tensor>(result->shape, false);
+            auto grad_mask = make_shared<Tensor>(result->shape, false, A->device);
             for(int i=0; i<result->size(); i++) {
                 grad_mask->at(i) = result->at(i) > 0.0f ? 1.0f : 0.0f;
             }
@@ -850,14 +871,16 @@ shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A) {
 }
 
 shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A) {
-    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad, A->device);
     
-    // CPU:
-    // for(int i=0; i<result->size(); i++){
-    //     result->at(i) = 1.0f/(1.0f+exp(-A->at(i)));
-    // }
-
-    launch_sigmoid(A, result);
+    if(A->device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++){
+            result->at(i) = 1.0f/(1.0f+exp(-A->at(i)));
+        }
+    } else {
+        launch_sigmoid(A, result);
+    }
 
     if(A->requires_grad){
         result->parents.push_back(A);
@@ -869,14 +892,16 @@ shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A) {
 }
 
 shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
-    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad, A->device);
     
-    // CPU:
-    // for(int i=0; i<result->size(); i++){
-    //     result->at(i) = (exp(A->at(i)) - exp(-A->at(i))) / (exp(A->at(i)) + exp(-A->at(i)));
-    // }
-
-    launch_tanh(A, result);
+    if(A->device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++){
+            result->at(i) = (exp(A->at(i)) - exp(-A->at(i))) / (exp(A->at(i)) + exp(-A->at(i)));
+        }
+    } else {
+        launch_tanh(A, result);
+    }
 
     if(A->requires_grad){
         result->parents.push_back(A);
@@ -888,7 +913,7 @@ shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A) {
 }
 
 shared_ptr<Tensor> dropout(const shared_ptr<Tensor>& A, float p, bool training) {
-    shared_ptr<Tensor> mask = make_shared<Tensor>(A->shape, false);
+    shared_ptr<Tensor> mask = make_shared<Tensor>(A->shape, false, A->device);
     
     // Generate mask on CPU
     if(!training || p == 0.0f) {
@@ -935,49 +960,49 @@ shared_ptr<Tensor> softmax(const shared_ptr<Tensor>& A, int axis) {
         }
     }
 
-    shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, A->requires_grad);
+    shared_ptr<Tensor> sm_exp = make_shared<Tensor>(sm_exp_shape, A->requires_grad, A->device);
 
-    // CPU START:
-    // // TODO: Same with cuda version, when dtype becomes adjustable, will need diff way to get max value for dtype
-    // // TODO: Same with cuda version, should be getting max along axis and not across entire tensor, and then shifting based on max along each axis
-    // float mx=-FLT_MAX;
-    // for(int i=0; i<sm_exp->size(); i++){
-    //     mx=std::max(mx, A->at(i));
-    // }
+    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad, A->device);
+    shared_ptr<Tensor> sm_exp_broadcast = make_shared<Tensor>(A->shape, false, A->device);
 
-    // for(int i=0; i<sm_exp->size(); i++){
-    //     for(int j=0; j<A->shape[axis]; j++){
+    if(A->device == DeviceType::CPU) {
+        // CPU START:
+        // TODO: Same with cuda version, when dtype becomes adjustable, will need diff way to get max value for dtype
+        // TODO: Same with cuda version, should be getting max along axis and not across entire tensor, and then shifting based on max along each axis
+        float mx=-FLT_MAX;
+        for(int i=0; i<sm_exp->size(); i++){
+            mx=std::max(mx, A->at(i));
+        }
 
-    //         int curr=i;
-    //         int idx=0;
-    //         for(int x=0; x<A->shape.size(); x++){
-    //             if(x==axis){
-    //                 idx+=j*A->strides[x];
-    //             } else {
-    //                 idx+=(curr/sm_exp->strides[x])*A->strides[x];
-    //             }
-    //             curr%=sm_exp->strides[x];
-    //         }
+        for(int i=0; i<sm_exp->size(); i++){
+            for(int j=0; j<A->shape[axis]; j++){
 
-    //         sm_exp->at(i)+=exp(A->at(idx)-mx);
-    //     }
-    // }
-    
+                int curr=i;
+                int idx=0;
+                for(int x=0; x<A->shape.size(); x++){
+                    if(x==axis){
+                        idx+=j*A->strides[x];
+                    } else {
+                        idx+=(curr/sm_exp->strides[x])*A->strides[x];
+                    }
+                    curr%=sm_exp->strides[x];
+                }
 
-    // shared_ptr<Tensor> sm_exp_broadcast = sm_exp->broadcast(A->shape, false);
+                sm_exp->at(i)+=exp(A->at(idx)-mx);
+            }
+        }
+        
 
-    // // Softmax should return the same shape as input
-    // shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
+        sm_exp_broadcast = sm_exp->broadcast(A->shape, false);
 
-    // for(int i=0; i<result->size(); i++){
-    //     result->at(i)=exp(A->at(i)-mx)/sm_exp_broadcast->at(i);
-    // }
-    // CPU END
-
-    shared_ptr<Tensor> result = make_shared<Tensor>(A->shape, A->requires_grad);
-    shared_ptr<Tensor> sm_exp_broadcast = make_shared<Tensor>(A->shape, false);
-
-    launch_softmax(A, sm_exp, sm_exp_broadcast, result, axis);
+        // Softmax should return the same shape as input
+        for(int i=0; i<result->size(); i++){
+            result->at(i)=exp(A->at(i)-mx)/sm_exp_broadcast->at(i);
+        }
+        // CPU END
+    } else {
+        launch_softmax(A, sm_exp, sm_exp_broadcast, result, axis);
+    }
 
     if(A->requires_grad){
         result->parents.push_back(A);
@@ -1010,56 +1035,58 @@ shared_ptr<Tensor> Tensor::cross_entropy(const shared_ptr<Tensor>& y_true, int a
         }
     }
 
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad, device);
 
-    // CPU:
-    // for(int i=0; i<result->size(); i++){
-    //     int c=-1;
-        
-    //     // First pass: find max value along axis for numerical stability
-    //     float max_val = -FLT_MAX;
-    //     for(int j=0; j<shape[axis]; j++){
-    //         int curr=i;
-    //         int idx=0;
-    //         for(int x=0; x<shape.size(); x++){
-    //             if(x==axis){
-    //                 idx+=j*strides[x];
-    //             } else {
-    //                 idx+=(curr/result->strides[x])*strides[x];
-    //             }
-    //             curr%=result->strides[x];
-    //         }
-    //         max_val = std::max(max_val, at(idx));
-    //     }
+    if(device == DeviceType::CPU) {
+        // CPU:
+        for(int i=0; i<result->size(); i++){
+            int c=-1;
+            
+            // First pass: find max value along axis for numerical stability
+            float max_val = -FLT_MAX;
+            for(int j=0; j<shape[axis]; j++){
+                int curr=i;
+                int idx=0;
+                for(int x=0; x<shape.size(); x++){
+                    if(x==axis){
+                        idx+=j*strides[x];
+                    } else {
+                        idx+=(curr/result->strides[x])*strides[x];
+                    }
+                    curr%=result->strides[x];
+                }
+                max_val = std::max(max_val, at(idx));
+            }
 
-    //     // Second pass: compute sum of exp(x - max) and find correct class
-    //     for(int j=0; j<shape[axis]; j++){
+            // Second pass: compute sum of exp(x - max) and find correct class
+            for(int j=0; j<shape[axis]; j++){
 
-    //         int curr=i;
-    //         int idx=0;
-    //         for(int x=0; x<shape.size(); x++){
-    //             if(x==axis){
-    //                 idx+=j*strides[x];
-    //             } else {
-    //                 idx+=(curr/result->strides[x])*strides[x];
-    //             }
-    //             curr%=result->strides[x];
-    //         }
+                int curr=i;
+                int idx=0;
+                for(int x=0; x<shape.size(); x++){
+                    if(x==axis){
+                        idx+=j*strides[x];
+                    } else {
+                        idx+=(curr/result->strides[x])*strides[x];
+                    }
+                    curr%=result->strides[x];
+                }
 
-    //         result->at(i)+=exp(at(idx) - max_val);
+                result->at(i)+=exp(at(idx) - max_val);
 
-    //         if(abs(y_true->at(idx)-1.0f)<=1e-5f){
-    //             c=idx;
-    //         }
-    //     }
-    //     if(c==-1){
-    //         throw std::runtime_error("Invalid y_true. No '1' found in ground truth vector.");
-    //     }
-    //     // log(sum(exp(x - max))) + max - x[c] = log(sum(exp(x))) - x[c]
-    //     result->at(i)=log(result->at(i)+1e-9f) + max_val - at(c);
-    // }
-
-    launch_cross_entropy(shared_from_this(), y_true, result, axis);
+                if(abs(y_true->at(idx)-1.0f)<=1e-5f){
+                    c=idx;
+                }
+            }
+            if(c==-1){
+                throw std::runtime_error("Invalid y_true. No '1' found in ground truth vector.");
+            }
+            // log(sum(exp(x - max))) + max - x[c] = log(sum(exp(x))) - x[c]
+            result->at(i)=log(result->at(i)+1e-9f) + max_val - at(c);
+        }
+    } else {
+        launch_cross_entropy(shared_from_this(), y_true, result, axis);
+    }
 
     if(requires_grad){
         result->parents.push_back(y_true);
@@ -1091,7 +1118,7 @@ shared_ptr<Tensor> Tensor::slice(int dim, int start, int end) {
     vector<int> new_shape = shape;
     new_shape[dim] = end - start;
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, requires_grad, device);
     
     for(int i = 0; i < result->size(); i++) {
         int curr = i;
@@ -1138,6 +1165,7 @@ shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis) {
     }
     
     vector<int> base_shape = tensors[0]->shape;
+    DeviceType device = tensors[0]->device;
     int total_dim = 0;
     bool any_requires_grad = false;
     
@@ -1157,7 +1185,7 @@ shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis) {
     vector<int> new_shape = base_shape;
     new_shape[axis] = total_dim;
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, any_requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(new_shape, any_requires_grad, device);
     
     int offset = 0;
     for(const auto& t : tensors) {
@@ -1243,7 +1271,7 @@ shared_ptr<Tensor> Tensor::masked_fill(const shared_ptr<Tensor>& mask, float val
         throw std::runtime_error("Mask size must match tensor size");
     }
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(shape, requires_grad, device);
     
     for(int idx = 0; idx < result->size(); idx++) {
         if(mask->at(idx) != 0.0f) {
@@ -1267,8 +1295,8 @@ shared_ptr<Tensor> Tensor::masked_fill(const shared_ptr<Tensor>& mask, float val
     return result;
 }
 
-shared_ptr<Tensor> tril(int rows, int cols) {
-    shared_ptr<Tensor> result = make_shared<Tensor>(vector<int>{rows, cols}, 0.0f, false);
+shared_ptr<Tensor> tril(int rows, int cols, DeviceType device) {
+    shared_ptr<Tensor> result = make_shared<Tensor>(vector<int>{rows, cols}, 0.0f, false, device);
     
     for(int idx = 0; idx < result->size(); idx++) {
         int row = idx / cols;
@@ -1281,14 +1309,14 @@ shared_ptr<Tensor> tril(int rows, int cols) {
     return result;
 }
 
-shared_ptr<Tensor> arange(float start, float end, float step) {
+shared_ptr<Tensor> arange(float start, float end, float step, DeviceType device) {
     if(step == 0.0f) {
         throw std::runtime_error("arange step cannot be zero");
     }
     int n = (int)ceil((end - start) / step);
     if(n <= 0) n = 0;
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(vector<int>{n}, 0.0f, false);
+    shared_ptr<Tensor> result = make_shared<Tensor>(vector<int>{n}, 0.0f, false, device);
     for(int i = 0; i < n; i++) {
         result->at(i) = start + i * step;
     }
@@ -1308,7 +1336,7 @@ shared_ptr<Tensor> multinomial(const shared_ptr<Tensor>& probs, int num_samples,
     
     vector<int> result_shape = probs->shape;
     result_shape.back() = num_samples;
-    shared_ptr<Tensor> result = make_shared<Tensor>(result_shape, 0.0f, false);
+    shared_ptr<Tensor> result = make_shared<Tensor>(result_shape, 0.0f, false, probs->device);
     
     for(int d = 0; d < num_distributions; d++) {
         vector<float> weights(probs->data + d * num_classes, probs->data + (d + 1) * num_classes);
@@ -1324,12 +1352,12 @@ shared_ptr<Tensor> multinomial(const shared_ptr<Tensor>& probs, int num_samples,
     return result;
 }
 
-shared_ptr<Tensor> randint(int low, int high, const vector<int>& shape) {
+shared_ptr<Tensor> randint(int low, int high, const vector<int>& shape, DeviceType device) {
     static std::random_device rd;
     static std::mt19937 gen(rd());
     std::uniform_int_distribution<int> dist(low, high - 1);
     
-    shared_ptr<Tensor> result = make_shared<Tensor>(shape, 0.0f, false);
+    shared_ptr<Tensor> result = make_shared<Tensor>(shape, 0.0f, false, device);
     for(int i = 0; i < result->size(); i++) {
         result->at(i) = (float)dist(gen);
     }
@@ -1346,7 +1374,7 @@ shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tens
     
     auto mean = A->mean(axis, true);
     auto var = A->variance_squared(axis, true);
-    auto eps = make_shared<Tensor>(var->shape, epsilon, false);
+    auto eps = make_shared<Tensor>(var->shape, epsilon, false, A->device);
     auto std_inv = (var + eps)->pow(-0.5f);
     auto x_norm = (A - mean->broadcast(A->shape)) * std_inv->broadcast(A->shape);
     auto result = x_norm * gamma->broadcast(A->shape) + beta->broadcast(A->shape);
@@ -1371,7 +1399,7 @@ shared_ptr<Tensor> embedding(const shared_ptr<Tensor>& weight, const shared_ptr<
     
     vector<int> result_shape = indices->shape;
     result_shape.push_back(embed_dim);
-    shared_ptr<Tensor> result = make_shared<Tensor>(result_shape, weight->requires_grad);
+    shared_ptr<Tensor> result = make_shared<Tensor>(result_shape, weight->requires_grad, weight->device);
     
     for(int idx = 0; idx < result->size(); idx++) {
         int i = idx / embed_dim;

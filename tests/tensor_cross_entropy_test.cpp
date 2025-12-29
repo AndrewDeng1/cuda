@@ -153,3 +153,57 @@ int main() {
     cout << "\n===== ALL TESTS COMPLETE =====" << endl;
 }
 
+// ===== BASIC 2D CROSS ENTROPY TEST =====
+// Logits:
+// Tensor(2, 3):
+// [1 , 2 , 3 ], [4 , 5 , 6 ]
+// Labels (one-hot):
+// Tensor(2, 3):
+// [0 , 0 , 1 ], [0 , 1 , 0 ]
+// Cross Entropy Loss:
+// Tensor(2, 1):
+// [0.407606 ], [1.40761 ]
+// Gradients for logits:
+// Tensor(2, 3):
+// [0.0900306 , 0.244728 , -0.334759], [0.0900306 , -0.755271, 0.665241 ]
+
+// ===== LARGE VALUES TEST (NUMERICAL STABILITY) =====
+// Logits (large values):
+// Tensor(1, 3):
+// [100 , 101 , 102 ]
+// Labels:
+// Tensor(1, 3):
+// [0 , 0 , 1 ]
+// Cross Entropy Loss (should NOT be NaN):
+// Tensor(1, 1):
+// [0.407608 ]
+// Gradients for large logits:
+// Tensor(1, 3):
+// [0.0900306 , 0.244728 , -0.334759]
+
+// ===== 3D CROSS ENTROPY TEST =====
+// 3D Logits:
+// Tensor(2, 2, 3):
+// [[1 , 2 , 3 ], [0.5 , 1.5 , 2.5 ]], [[2 , 1 , 0 ], [3 , 2 , 1 ]]
+// 3D Labels:
+// Tensor(2, 2, 3):
+// [[0 , 0 , 1 ], [0 , 1 , 0 ]], [[1 , 0 , 0 ], [1 , 0 , 0 ]]
+// 3D Cross Entropy Loss:
+// Tensor(2, 2, 1):
+// [[0.407606 ], [1.40761 ]], [[0.407606 ], [0.407606 ]]
+// 3D Gradients:
+// Tensor(2, 2, 3):
+// [[0.0900306 , 0.244728 , -0.334759], [0.0900306 , -0.755272, 0.665241 ]], [[-0.334759, 0.244728 , 0.0900306 ], [-0.334759, 0.244728 , 0.0900306 ]]
+
+// ===== NEGATIVE VALUES TEST =====
+// Logits (negative values):
+// Tensor(1, 3):
+// [-10, -5, -1]
+// Cross Entropy Loss:
+// Tensor(1, 1):
+// [9.01827 ]
+// Gradients:
+// Tensor(1, 3):
+// [-0.999879, 0.017984 , 0.981895 ]
+
+// ===== ALL TESTS COMPLETE =====

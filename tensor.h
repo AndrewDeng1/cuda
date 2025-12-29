@@ -13,14 +13,20 @@
 
 using namespace std;
 
+enum class DeviceType {
+    CPU,
+    CUDA
+};
+
+// TODO: Revert default device to CUDA
 class Tensor : public enable_shared_from_this<Tensor> {
     
     public:
         Tensor();
-        Tensor(const vector<int>& shape, bool requires_grad=false);
-        Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad=false);
-        Tensor(const vector<int>& shape, float* data, bool requires_grad=false);
-        Tensor(const vector<int>& shape, float num, bool requires_grad=false);
+        Tensor(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+        Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+        Tensor(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+        Tensor(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
         Tensor(shared_ptr<Tensor> other);
 
         // // Member functions
@@ -47,6 +53,7 @@ class Tensor : public enable_shared_from_this<Tensor> {
 
         // // Member variables
         bool requires_grad;
+        DeviceType device;
         vector<int> shape;
         vector<int> strides;
         float* data;
@@ -87,10 +94,10 @@ shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis);
 shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis = 0);
 shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon = 1e-5f);
 shared_ptr<Tensor> embedding(const shared_ptr<Tensor>& weight, const shared_ptr<Tensor>& indices);
-shared_ptr<Tensor> tril(int rows, int cols);
-shared_ptr<Tensor> arange(float start, float end, float step = 1.0f);
+shared_ptr<Tensor> tril(int rows, int cols, DeviceType device = DeviceType::CPU);
+shared_ptr<Tensor> arange(float start, float end, float step = 1.0f, DeviceType device = DeviceType::CPU);
 shared_ptr<Tensor> multinomial(const shared_ptr<Tensor>& probs, int num_samples, bool replacement = false);
-shared_ptr<Tensor> randint(int low, int high, const vector<int>& shape);
+shared_ptr<Tensor> randint(int low, int high, const vector<int>& shape, DeviceType device = DeviceType::CPU);
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);
