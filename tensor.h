@@ -18,86 +18,148 @@ enum class DeviceType {
     CUDA
 };
 
+// Forward declarations
+class Tensor;
+class TensorImpl;
+
 // TODO: Revert default device to CUDA
-class Tensor : public enable_shared_from_this<Tensor> {
-    
-    public:
-        Tensor();
-        Tensor(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-        Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-        Tensor(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-        Tensor(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-        Tensor(shared_ptr<Tensor> other);
+// TensorImpl contains all the actual data and fields
+class TensorImpl : public enable_shared_from_this<TensorImpl> {
+public:
+    // Constructors
+    TensorImpl();
+    TensorImpl(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    TensorImpl(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    TensorImpl(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    TensorImpl(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    TensorImpl(shared_ptr<TensorImpl> other);
 
-        // // Member functions
-        int size();
-        // void backward();
-        float& at(vector<int> indices);
-        float& at(int index);
-        vector<int> compute_strides(const vector<int>& shape);
-        shared_ptr<Tensor> reshape(const vector<int>& new_shape);
-        shared_ptr<Tensor> reduce_to_shape(const vector<int>& target_shape);
-        shared_ptr<Tensor> sum(int axis, bool keepdims=true);
-        shared_ptr<Tensor> transpose(int dim1, int dim2);
-        shared_ptr<Tensor> mean(int axis, bool keepdims=true);
-        shared_ptr<Tensor> variance_squared(int axis, bool keepdims=true);
-        shared_ptr<Tensor> pow(float exponent);
-        shared_ptr<Tensor> cross_entropy(const shared_ptr<Tensor>& y_true, int axis, bool keepdims=true);
-        shared_ptr<Tensor> slice(int dim, int start, int end);
-        shared_ptr<Tensor> masked_fill(const shared_ptr<Tensor>& mask, float value);
-        void backward();
-        void print();
+    // Big 5
+    ~TensorImpl();                                      // Destructor
+    TensorImpl(const TensorImpl& other);                // Copy constructor
+    TensorImpl& operator=(const TensorImpl& other);     // Copy assignment
+    TensorImpl(TensorImpl&& other) noexcept;            // Move constructor
+    TensorImpl& operator=(TensorImpl&& other) noexcept; // Move assignment
 
-        // Broadcasting and reduction operations
-        shared_ptr<Tensor> broadcast(const vector<int>& new_shape, bool matmul = false);
+    int size() const;
+    float& at(vector<int> indices);
+    float& at(int index);
+    vector<int> compute_strides(const vector<int>& shape);
+    void print();
 
-        // // Member variables
-        bool requires_grad;
-        DeviceType device;
-        vector<int> shape;
-        vector<int> strides;
-        float* data;
-        shared_ptr<Tensor> grad;
-        vector<shared_ptr<Tensor>> parents;
-        function<void()> backward_fn;
+    // Member variables
+    bool requires_grad;
+    DeviceType device;
+    vector<int> shape;
+    vector<int> strides;
+    float* data;
+    shared_ptr<TensorImpl> grad;  // grad is now TensorImpl
+    vector<shared_ptr<TensorImpl>> parents;  // parents are TensorImpl
+    function<void()> backward_fn;
 };
 
-// // Free function declarations
-shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor>& operator+=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor>& operator-=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor>& operator*=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor>& operator/=(shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+// Tensor is a wrapper around TensorImpl
+class Tensor {
+public:
+    shared_ptr<TensorImpl> impl;
+
+    // Constructors
+    Tensor();
+    Tensor(shared_ptr<TensorImpl> impl);  // Wrap existing impl
+    Tensor(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    Tensor(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    Tensor(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    // Initializer list constructors for cleaner syntax
+    Tensor(initializer_list<int> shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    Tensor(initializer_list<int> shape, initializer_list<float> data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    Tensor(initializer_list<int> shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+
+    // Big 5
+    ~Tensor() = default;                            // Destructor (shared_ptr handles cleanup)
+    Tensor(const Tensor& other);                    // Copy constructor (deep copy)
+    Tensor& operator=(const Tensor& other);         // Copy assignment (deep copy)
+    Tensor(Tensor&& other) noexcept;                // Move constructor
+    Tensor& operator=(Tensor&& other) noexcept;     // Move assignment
+    
+    Tensor clone() const;                           // Deep copy
+
+    // Accessors (forward to impl)
+    int size() const;
+    float& at(vector<int> indices);
+    float& at(int index);
+    float& at(vector<int> indices) const;
+    float& at(int index) const;
+    vector<int> compute_strides(const vector<int>& shape);
+    
+    // Member functions
+    Tensor reshape(const vector<int>& new_shape) const;
+    Tensor reduce_to_shape(const vector<int>& target_shape) const;
+    Tensor sum(int axis, bool keepdims=true) const;
+    Tensor transpose(int dim1, int dim2) const;
+    Tensor mean(int axis, bool keepdims=true) const;
+    Tensor variance_squared(int axis, bool keepdims=true) const;
+    Tensor pow(float exponent) const;
+    Tensor cross_entropy(const Tensor& y_true, int axis, bool keepdims=true) const;
+    Tensor slice(int dim, int start, int end) const;
+    Tensor masked_fill(const Tensor& mask, float value) const;
+    void backward();
+    void print() const;
+
+    // Broadcasting and reduction operations
+    Tensor broadcast(const vector<int>& new_shape, bool matmul = false) const;
+
+    // Property accessors
+    bool requires_grad() const { return impl->requires_grad; }
+    void set_requires_grad(bool val) { impl->requires_grad = val; }
+    DeviceType device() const { return impl->device; }
+    const vector<int>& shape() const { return impl->shape; }
+    const vector<int>& strides() const { return impl->strides; }
+    float* data() const { return impl->data; }
+    
+    // Grad accessor - returns Tensor wrapping the grad impl
+    Tensor grad() const;
+    void set_grad(const Tensor& g);
+    bool has_grad() const { return impl->grad != nullptr; }
+};
+
+// Free function declarations - now take Tensor& instead of shared_ptr<Tensor>
+Tensor operator+(const Tensor& A, const Tensor& B);
+Tensor operator-(const Tensor& A, const Tensor& B);
+Tensor operator*(const Tensor& A, const Tensor& B);
+Tensor operator/(const Tensor& A, const Tensor& B);
+Tensor& operator+=(Tensor& A, const Tensor& B);
+Tensor& operator-=(Tensor& A, const Tensor& B);
+Tensor& operator*=(Tensor& A, const Tensor& B);
+Tensor& operator/=(Tensor& A, const Tensor& B);
 
 // Scalar-tensor operators
-shared_ptr<Tensor> operator+(const shared_ptr<Tensor>& A, float B);
-shared_ptr<Tensor> operator+(float A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A, float B);
-shared_ptr<Tensor> operator-(float A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor> operator-(const shared_ptr<Tensor>& A);
-shared_ptr<Tensor> operator*(const shared_ptr<Tensor>& A, float B);
-shared_ptr<Tensor> operator*(float A, const shared_ptr<Tensor>& B);
-shared_ptr<Tensor> operator/(const shared_ptr<Tensor>& A, float B);
-shared_ptr<Tensor> operator/(float A, const shared_ptr<Tensor>& B);
+Tensor operator+(const Tensor& A, float B);
+Tensor operator+(float A, const Tensor& B);
+Tensor operator-(const Tensor& A, float B);
+Tensor operator-(float A, const Tensor& B);
+Tensor operator-(const Tensor& A);
+Tensor operator*(const Tensor& A, float B);
+Tensor operator*(float A, const Tensor& B);
+Tensor operator/(const Tensor& A, float B);
+Tensor operator/(float A, const Tensor& B);
 
-shared_ptr<Tensor> matmul(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& B);
+Tensor matmul(const Tensor& A, const Tensor& B);
 
-shared_ptr<Tensor> relu(const shared_ptr<Tensor>& A);
-shared_ptr<Tensor> sigmoid(const shared_ptr<Tensor>& A);
-shared_ptr<Tensor> tanh(const shared_ptr<Tensor>& A);
-shared_ptr<Tensor> softmax(const shared_ptr<Tensor>& A, int axis);
-shared_ptr<Tensor> dropout(const shared_ptr<Tensor>& A, float p = 0.5f, bool training = true);
-shared_ptr<Tensor> cat(const vector<shared_ptr<Tensor>>& tensors, int axis);
-shared_ptr<Tensor> stack(const vector<shared_ptr<Tensor>>& tensors, int axis = 0);
-shared_ptr<Tensor> layer_norm(const shared_ptr<Tensor>& A, const shared_ptr<Tensor>& gamma, const shared_ptr<Tensor>& beta, float epsilon = 1e-5f);
-shared_ptr<Tensor> embedding(const shared_ptr<Tensor>& weight, const shared_ptr<Tensor>& indices);
-shared_ptr<Tensor> tril(int rows, int cols, DeviceType device = DeviceType::CPU);
-shared_ptr<Tensor> arange(float start, float end, float step = 1.0f, DeviceType device = DeviceType::CPU);
-shared_ptr<Tensor> multinomial(const shared_ptr<Tensor>& probs, int num_samples, bool replacement = false);
-shared_ptr<Tensor> randint(int low, int high, const vector<int>& shape, DeviceType device = DeviceType::CPU);
+Tensor relu(const Tensor& A);
+Tensor sigmoid(const Tensor& A);
+Tensor tanh_op(const Tensor& A);  // renamed to avoid conflict with std::tanh
+Tensor softmax(const Tensor& A, int axis);
+Tensor dropout(const Tensor& A, float p = 0.5f, bool training = true);
+Tensor cat(const vector<Tensor>& tensors, int axis);
+Tensor stack(const vector<Tensor>& tensors, int axis = 0);
+Tensor layer_norm(const Tensor& A, const Tensor& gamma, const Tensor& beta, float epsilon = 1e-5f);
+Tensor embedding(const Tensor& weight, const Tensor& indices);
+Tensor embedding(const Tensor& weight, const vector<int>& indices);
+Tensor tril(int rows, int cols, DeviceType device = DeviceType::CPU);
+Tensor arange(float start, float end, float step = 1.0f, DeviceType device = DeviceType::CPU);
+Tensor multinomial(const Tensor& probs, int num_samples, bool replacement = false);
+Tensor randint(int low, int high, const vector<int>& shape, DeviceType device = DeviceType::CPU);
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);

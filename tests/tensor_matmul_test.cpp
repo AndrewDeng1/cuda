@@ -6,34 +6,32 @@
 int main() {
     
     // // Create a 2x3 tensor
-    vector<int> shape = {2, 3, 4};
-    vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f, 19.0f, 20.0f, 21.0f, 22.0f, 23.0f, 24.0f};
-    auto t1 = make_shared<Tensor>(shape, data, true);
-    auto t2 = make_shared<Tensor>(vector<int>{4, 2}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, true);
-    auto t3 = matmul(t1, t2);
-    t1->print();
-    t2->print();
-    t3->print();
-    t3->grad = make_shared<Tensor>(vector<int>{2, 3, 2}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f}, true);
-    t3->backward();
-    t1->grad->print();
-    t2->grad->print();
+    Tensor t1({2, 3, 4}, {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f, 19.0f, 20.0f, 21.0f, 22.0f, 23.0f, 24.0f}, true);
+    Tensor t2({4, 2}, {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, true);
+    Tensor t3 = matmul(t1, t2);
+    t1.print();
+    t2.print();
+    t3.print();
+    t3.set_grad(Tensor({2, 3, 2}, {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f}, true));
+    t3.backward();
+    t1.grad().print();
+    t2.grad().print();
 
-    auto t4 = make_shared<Tensor>(vector<int>{1, 5}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, true);
-    auto t5 = make_shared<Tensor>(vector<int>{5, 1}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, true);
-    auto t6 = matmul(t4, t5);
-    t6->print();
-    t6->grad = make_shared<Tensor>(vector<int>{1, 1}, vector<float>{1.0f}, true);
-    t6->backward();
-    t4->grad->print();
-    t5->grad->print();
+    Tensor t4({1, 5}, {1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, true);
+    Tensor t5({5, 1}, {1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, true);
+    Tensor t6 = matmul(t4, t5);
+    t6.print();
+    t6.set_grad(Tensor({1, 1}, {1.0f}, true));
+    t6.backward();
+    t4.grad().print();
+    t5.grad().print();
 
-    // auto t7 = make_shared<Tensor>(vector<int>{1, 5}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, true);
-    // auto t8 = make_shared<Tensor>(vector<int>{4, 1}, vector<float>{1.0f, 2.0f, 3.0f, 4.0f}, true);
-    // auto t9 = matmul(t7, t8);
+    // Tensor t7({1, 5}, {1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, true);
+    // Tensor t8({4, 1}, {1.0f, 2.0f, 3.0f, 4.0f}, true);
+    // Tensor t9 = matmul(t7, t8);
 
-    // auto t10 = make_shared<Tensor>(vector<int>{1}, vector<float>{1.0f}, true);
-    // auto t11 = matmul(t10, t9);
+    // Tensor t10({1}, {1.0f}, true);
+    // Tensor t11 = matmul(t10, t9);
 }
 
 
