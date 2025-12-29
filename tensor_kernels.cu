@@ -23,23 +23,23 @@ struct TensorStruct {
         on_cpu=t_on_cpu;
     }
 
-    TensorStruct(shared_ptr<Tensor> t, bool t_on_cpu=false) {
-        shape_size = t->shape.size();
+    TensorStruct(const Tensor& t, bool t_on_cpu=false) {
+        shape_size = t.shape().size();
         shape_size_bytes = shape_size*sizeof(int);
         shape = new int[shape_size];
         for(int i = 0; i < shape_size; i++) {
-            shape[i] = t->shape[i];
+            shape[i] = t.shape()[i];
         }
         
-        strides_size = t->strides.size();
+        strides_size = t.strides().size();
         strides_size_bytes = strides_size*sizeof(int);
         strides = new int[strides_size];
         for(int i = 0; i < strides_size; i++) {
-            strides[i] = t->strides[i];
+            strides[i] = t.strides()[i];
         }
         
-        data = t->data;
-        data_size = t->size();
+        data = t.data();
+        data_size = t.size();
         data_size_bytes = data_size*sizeof(float);
         on_cpu=t_on_cpu;
     }
@@ -84,16 +84,9 @@ struct TensorStruct {
     // Unnecessary as long as the shape and strides for the tensor are unaffected by operation,
     // assuming you're doing standard 1. Create TensorStruct 2. cudaMallocTensorStruct
     // 3. cudaMemcpyTensorStruct 4. Operation 5. cudaMemcpyTensorSTruct back 6. cudaFreeTensorStruct
-    void toTensor(shared_ptr<Tensor> t){
-        t->data = data;
-        t->shape = vector<int>();
-        for(int i=0; i<shape_size; i++){
-            t->shape.push_back(shape[i]);
-        }
-        t->strides = vector<int>();
-        for(int i=0; i<strides_size; i++){
-            t->strides.push_back(strides[i]);
-        }
+    void toTensor(Tensor& t){
+        // Note: This would need updating to work with new Tensor API
+        // For now, the data pointer is shared so results are automatically reflected
     }
 };
 
@@ -129,11 +122,11 @@ __global__ void add_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
     c.data[idx] = a.data[idx] + b.data[idx];
 }
 
-void launch_add(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result){
+void launch_add(const Tensor& a, const Tensor& b, Tensor& result){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
     TensorStruct c_struct(result);
-    int N = result->size();
+    int N = result.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -163,11 +156,11 @@ __global__ void subtract_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
     c.data[idx] = a.data[idx] - b.data[idx];
 }
 
-void launch_subtract(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result){
+void launch_subtract(const Tensor& a, const Tensor& b, Tensor& result){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
     TensorStruct c_struct(result);
-    int N = result->size();
+    int N = result.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -197,11 +190,11 @@ __global__ void multiply_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
     c.data[idx] = a.data[idx] * b.data[idx];
 }
 
-void launch_multiply(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result){
+void launch_multiply(const Tensor& a, const Tensor& b, Tensor& result){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
     TensorStruct c_struct(result);
-    int N = result->size();
+    int N = result.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -231,11 +224,11 @@ __global__ void divide_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
     c.data[idx] = a.data[idx] / b.data[idx];
 }
 
-void launch_divide(shared_ptr<Tensor> a, shared_ptr<Tensor> b, shared_ptr<Tensor> result){
+void launch_divide(const Tensor& a, const Tensor& b, Tensor& result){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
     TensorStruct c_struct(result);
-    int N = result->size();
+    int N = result.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -278,10 +271,10 @@ __global__ void broadcast_kernel(TensorStruct a, TensorStruct b, bool matmul){
     b.data[idx] = a.data[cnt];
 }
 
-void launch_broadcast(shared_ptr<Tensor>a, shared_ptr<Tensor>b, vector<int>& padded_shape, vector<int>& padded_strides, bool matmul){
-    TensorStruct a_struct(a->data, a->size(), padded_shape, padded_strides);
+void launch_broadcast(const Tensor& a, Tensor& b, vector<int>& padded_shape, vector<int>& padded_strides, bool matmul){
+    TensorStruct a_struct(a.data(), a.size(), padded_shape, padded_strides);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -324,10 +317,10 @@ __global__ void sum_kernel(TensorStruct a, TensorStruct b, int axis){
     }
 }
 
-void launch_sum(shared_ptr<Tensor>a, shared_ptr<Tensor>b, int axis){
+void launch_sum(const Tensor& a, Tensor& b, int axis){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -372,10 +365,10 @@ __global__ void transpose_kernel(TensorStruct a, TensorStruct b, int dim1, int d
     b.data[idx]=a.data[ind];
 }
 
-void launch_transpose(shared_ptr<Tensor>a, shared_ptr<Tensor>b, int dim1, int dim2){
+void launch_transpose(const Tensor& a, Tensor& b, int dim1, int dim2){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -403,10 +396,10 @@ __global__ void pow_kernel(TensorStruct a, TensorStruct b, int exponent){
     b.data[idx] = powf(a.data[idx], exponent);
 }
 
-void launch_pow(shared_ptr<Tensor>a, shared_ptr<Tensor>b, int exponent){
+void launch_pow(const Tensor& a, Tensor& b, int exponent){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -434,10 +427,10 @@ __global__ void relu_kernel(TensorStruct a, TensorStruct b){
     b.data[idx] = fmaxf(0.0f, a.data[idx]);
 }
 
-void launch_relu(shared_ptr<Tensor>a, shared_ptr<Tensor>b){
+void launch_relu(const Tensor& a, Tensor& b){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -465,10 +458,10 @@ __global__ void sigmoid_kernel(TensorStruct a, TensorStruct b){
     b.data[idx] = 1.0f/(1.0f+expf(-a.data[idx]));
 }
 
-void launch_sigmoid(shared_ptr<Tensor>a, shared_ptr<Tensor>b){
+void launch_sigmoid(const Tensor& a, Tensor& b){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -496,10 +489,10 @@ __global__ void tanh_kernel(TensorStruct a, TensorStruct b){
     b.data[idx] = (expf(a.data[idx]) - expf(-a.data[idx])) / (expf(a.data[idx]) + expf(-a.data[idx]));
 }
 
-void launch_tanh(shared_ptr<Tensor>a, shared_ptr<Tensor>b){
+void launch_tanh(const Tensor& a, Tensor& b){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -549,20 +542,20 @@ __global__ void exp_kernel(TensorStruct a, TensorStruct b, float shift = 0.0f){
     b.data[idx]=expf(a.data[idx] - shift);
 }
 
-void launch_softmax(shared_ptr<Tensor>a, shared_ptr<Tensor>sm_exp, shared_ptr<Tensor> sm_exp_broadcast, shared_ptr<Tensor>b, int axis){
+void launch_softmax(const Tensor& a, Tensor& sm_exp, Tensor& sm_exp_broadcast, Tensor& b, int axis){
     TensorStruct a_struct(a);
     TensorStruct sm_exp_struct(sm_exp);
     TensorStruct sm_exp_broadcast_struct(sm_exp_broadcast);
     TensorStruct b_struct(b);
-    int N = b->size();
+    int N = b.size();
 
     // TODO: When later make it possible to specify dtype, will have to change this code to get max value for that dtype
     // TODO: Also technically should be finding the max value along each axis and shifting by the max value per axis, this is very lazy way but works ig?
     // Find max value in input tensor for numerical stability
     float max_val = -FLT_MAX;
-    for(int i = 0; i < a->size(); i++){
-        if(a->data[i] > max_val){
-            max_val = a->data[i];
+    for(int i = 0; i < a.size(); i++){
+        if(a.data()[i] > max_val){
+            max_val = a.data()[i];
         }
     }
 
@@ -581,9 +574,9 @@ void launch_softmax(shared_ptr<Tensor>a, shared_ptr<Tensor>sm_exp, shared_ptr<Te
     cuda_memcpy_tensor_struct(d_sm_exp_broadcast_struct, sm_exp_broadcast_struct, cudaMemcpyHostToDevice);
     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
 
-    sum_exp_kernel<<<(sm_exp->size()+255)/256, 256>>>(d_a_struct, d_sm_exp_struct, axis, max_val);
+    sum_exp_kernel<<<(sm_exp.size()+255)/256, 256>>>(d_a_struct, d_sm_exp_struct, axis, max_val);
     cudaDeviceSynchronize();
-    broadcast_kernel<<<(sm_exp_broadcast->size()+255)/256, 256>>>(d_sm_exp_struct, d_sm_exp_broadcast_struct, false);
+    broadcast_kernel<<<(sm_exp_broadcast.size()+255)/256, 256>>>(d_sm_exp_struct, d_sm_exp_broadcast_struct, false);
     cudaDeviceSynchronize();
     exp_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_a_struct, max_val);
     cudaDeviceSynchronize();
@@ -638,11 +631,11 @@ __global__ void matmul_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
     }
 }
 
-void launch_matmul(shared_ptr<Tensor>a, shared_ptr<Tensor>b, shared_ptr<Tensor>c){
+void launch_matmul(const Tensor& a, const Tensor& b, Tensor& c){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
     TensorStruct c_struct(c);
-    int N = c->size();
+    int N = c.size();
 
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
@@ -716,11 +709,11 @@ __global__ void cross_entropy_kernel(TensorStruct logits, TensorStruct y_true, T
     result.data[idx] = logf(sum_exp + 1e-9f) + max_val - logits.data[correct_idx];
 }
 
-void launch_cross_entropy(shared_ptr<Tensor> logits, shared_ptr<Tensor> y_true, shared_ptr<Tensor> result, int axis){
+void launch_cross_entropy(const Tensor& logits, const Tensor& y_true, Tensor& result, int axis){
     TensorStruct logits_struct(logits);
     TensorStruct y_true_struct(y_true);
     TensorStruct result_struct(result);
-    int N = result->size();
+    int N = result.size();
 
     TensorStruct d_logits_struct(false);
     TensorStruct d_y_true_struct(false);

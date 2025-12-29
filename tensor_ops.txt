@@ -21,8 +21,8 @@ NegativeLogLikelihood,
 
 todo:
 
-- Enable user not needing to use shared_ptr
-    - make Tensor class that wraps shared pointer to TensorImpl, then change all tensor operations 
++ Enable user not needing to use shared_ptr
+    + make Tensor class that wraps shared pointer to TensorImpl, then change all tensor operations 
 to work with this (good enough for now)
     - make TensorImpl wrap shared pointer to Storage class, which stores data, bytes, etc.
     - add "offset" to TensorImpl
@@ -36,11 +36,13 @@ to work with this (good enough for now)
 - Get nn.Module and all layers working
 - Get gpt.py working
 
+- Test CUDA ops again, just get cursor to do all tests again but pass in cuda device type (or change defaults to cuda)
+
 tmr:
-- Add DeviceType field to Tensor object
-- TensorImpl
++ Add DeviceType field to Tensor object
++ TensorImpl
     - Implement correct way to pass Tensor objects to cuda kernels
-    - Do a lot of testing
-    - Remove all the const casts? Maybe solve by making copy constructor?
+    + Do a lot of testing
+    + Remove all the const casts? Maybe solve by making copy constructor?
 - Figure out how nn.Module nn.Parameters optimizer gonna work
 - Implement gpt.py w library

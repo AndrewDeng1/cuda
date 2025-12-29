@@ -422,10 +422,7 @@ Tensor Tensor::sum(int axis, bool keepdims) const {
             }
         }
     } else {
-        // For CUDA, we need to create shared_ptr wrappers for the launch function
-        auto this_ptr = make_shared<Tensor>(*this);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_sum(this_ptr, result_ptr, axis);
+        launch_sum(*this, result, axis);
     }
 
     if(impl->requires_grad) {
@@ -541,9 +538,7 @@ Tensor Tensor::broadcast(const vector<int>& new_shape, bool matmul) const {
             result.at(i) = impl->at(idx);
         }
     } else {
-        auto this_ptr = make_shared<Tensor>(*this);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_broadcast(this_ptr, result_ptr, padded_shape, padded_strides, matmul);
+        launch_broadcast(*this, result, padded_shape, padded_strides, matmul);
     }
 
     if(impl->requires_grad) {
@@ -629,10 +624,7 @@ Tensor operator+(const Tensor& A, const Tensor& B) {
             result.at(i) = new_A.at(i) + new_B.at(i);
         }
     } else {
-        auto new_A_ptr = make_shared<Tensor>(new_A);
-        auto new_B_ptr = make_shared<Tensor>(new_B);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_add(new_A_ptr, new_B_ptr, result_ptr);
+        launch_add(new_A, new_B, result);
     }
 
     if(new_A.requires_grad() || new_B.requires_grad()) {
@@ -679,10 +671,7 @@ Tensor operator-(const Tensor& A, const Tensor& B) {
             result.at(i) = new_A.at(i) - new_B.at(i);
         }
     } else {
-        auto new_A_ptr = make_shared<Tensor>(new_A);
-        auto new_B_ptr = make_shared<Tensor>(new_B);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_subtract(new_A_ptr, new_B_ptr, result_ptr);
+        launch_subtract(new_A, new_B, result);
     }
 
     if(new_A.requires_grad() || new_B.requires_grad()) {
@@ -729,10 +718,7 @@ Tensor operator*(const Tensor& A, const Tensor& B) {
             result.at(i) = new_A.at(i) * new_B.at(i);
         }
     } else {
-        auto new_A_ptr = make_shared<Tensor>(new_A);
-        auto new_B_ptr = make_shared<Tensor>(new_B);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_multiply(new_A_ptr, new_B_ptr, result_ptr);
+        launch_multiply(new_A, new_B, result);
     }
 
     if(new_A.requires_grad() || new_B.requires_grad()) {
@@ -779,10 +765,7 @@ Tensor operator/(const Tensor& A, const Tensor& B) {
             result.at(i) = new_A.at(i) / new_B.at(i);
         }
     } else {
-        auto new_A_ptr = make_shared<Tensor>(new_A);
-        auto new_B_ptr = make_shared<Tensor>(new_B);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_divide(new_A_ptr, new_B_ptr, result_ptr);
+        launch_divide(new_A, new_B, result);
     }
 
     if(new_A.requires_grad() || new_B.requires_grad()) {
@@ -932,10 +915,7 @@ Tensor matmul(const Tensor& A, const Tensor& B) {
             }
         }
     } else {
-        auto new_A_ptr = make_shared<Tensor>(new_A);
-        auto new_B_ptr = make_shared<Tensor>(new_B);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_matmul(new_A_ptr, new_B_ptr, result_ptr);
+        launch_matmul(new_A, new_B, result);
     }
     
     if(new_A.requires_grad() || new_B.requires_grad()) {
@@ -1016,9 +996,7 @@ Tensor Tensor::transpose(int dim1, int dim2) const {
             result.at(i) = impl->at(ind);
         }
     } else {
-        auto this_ptr = make_shared<Tensor>(*this);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_transpose(this_ptr, result_ptr, actual_dim1, actual_dim2);
+        launch_transpose(*this, result, actual_dim1, actual_dim2);
     }
 
     if(impl->requires_grad) {
@@ -1045,9 +1023,7 @@ Tensor Tensor::pow(float exponent) const {
             result.at(i) = std::pow(impl->at(i), exponent);
         }
     } else {
-        auto this_ptr = make_shared<Tensor>(*this);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_pow(this_ptr, result_ptr, exponent);
+        launch_pow(*this, result, exponent);
     }
 
     if(impl->requires_grad) {
@@ -1083,9 +1059,7 @@ Tensor relu(const Tensor& A) {
             result.at(i) = std::max(0.0f, A.at(i));
         }
     } else {
-        auto A_ptr = make_shared<Tensor>(A);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_relu(A_ptr, result_ptr);
+        launch_relu(A, result);
     }
 
     if(A.requires_grad()) {
@@ -1115,9 +1089,7 @@ Tensor sigmoid(const Tensor& A) {
             result.at(i) = 1.0f / (1.0f + exp(-A.at(i)));
         }
     } else {
-        auto A_ptr = make_shared<Tensor>(A);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_sigmoid(A_ptr, result_ptr);
+        launch_sigmoid(A, result);
     }
 
     if(A.requires_grad()) {
@@ -1142,9 +1114,7 @@ Tensor tanh_op(const Tensor& A) {
             result.at(i) = (exp(A.at(i)) - exp(-A.at(i))) / (exp(A.at(i)) + exp(-A.at(i)));
         }
     } else {
-        auto A_ptr = make_shared<Tensor>(A);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_tanh(A_ptr, result_ptr);
+        launch_tanh(A, result);
     }
 
     if(A.requires_grad()) {
@@ -1247,11 +1217,7 @@ Tensor softmax(const Tensor& A, int axis) {
             result.at(i) = exp(A.at(i) - mx) / sm_exp_broadcast.at(i);
         }
     } else {
-        auto A_ptr = make_shared<Tensor>(A);
-        auto sm_exp_ptr = make_shared<Tensor>(sm_exp);
-        auto sm_exp_broadcast_ptr = make_shared<Tensor>(sm_exp_broadcast);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_softmax(A_ptr, sm_exp_ptr, sm_exp_broadcast_ptr, result_ptr, actual_axis);
+        launch_softmax(A, sm_exp, sm_exp_broadcast, result, actual_axis);
     }
 
     if(A.requires_grad()) {
@@ -1336,10 +1302,7 @@ Tensor Tensor::cross_entropy(const Tensor& y_true, int axis, bool keepdims) cons
             result.at(i) = log(result.at(i) + 1e-9f) + max_val - impl->at(c);
         }
     } else {
-        auto this_ptr = make_shared<Tensor>(*this);
-        auto y_true_ptr = make_shared<Tensor>(y_true);
-        auto result_ptr = make_shared<Tensor>(result);
-        launch_cross_entropy(this_ptr, y_true_ptr, result_ptr, actual_axis);
+        launch_cross_entropy(*this, y_true, result, actual_axis);
     }
 
     if(impl->requires_grad) {
