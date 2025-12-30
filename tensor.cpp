@@ -321,14 +321,43 @@ void Tensor::print() const {
 }
 
 Tensor Tensor::reshape(const vector<int>& new_shape) const {
+    vector<int> resolved_shape = new_shape;
+    
+    // Handle -1 (infer dimension)
+    int neg_one_idx = -1;
+    int product_without_neg = 1;
+    for (size_t i = 0; i < resolved_shape.size(); i++) {
+        if (resolved_shape[i] == -1) {
+            if (neg_one_idx != -1) {
+                throw std::runtime_error("Reshape: only one dimension can be -1");
+            }
+            neg_one_idx = i;
+        } else {
+            product_without_neg *= resolved_shape[i];
+        }
+    }
+    
+    // If -1 found, calculate inferred dimension
+    if (neg_one_idx != -1) {
+        if (product_without_neg == 0) {
+            throw std::runtime_error("Reshape: cannot infer dimension when other dimensions multiply to 0");
+        }
+        int inferred_dim = size() / product_without_neg;
+        if (inferred_dim * product_without_neg != size()) {
+            throw std::runtime_error("Reshape size mismatch: cannot infer valid dimension");
+        }
+        resolved_shape[neg_one_idx] = inferred_dim;
+    }
+    
+    // Validate total size
     int cnt = 1;
-    for (int dim : new_shape) cnt *= dim;
+    for (int dim : resolved_shape) cnt *= dim;
     
     if(cnt != size()) {
         throw std::runtime_error("Reshape size mismatch");
     }
 
-    Tensor result(new_shape, impl->data, impl->requires_grad, impl->device);
+    Tensor result(resolved_shape, impl->data, impl->requires_grad, impl->device);
 
     if(impl->requires_grad) {
         shared_ptr<TensorImpl> this_impl = impl;

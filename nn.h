@@ -65,10 +65,15 @@ public:
     
     // Move - invalidate registration, will re-register on first access
     Module(Module&& other) noexcept 
-        : registered_(false), parameters_(), submodules_(), training_(other.training_) {}
+        : registered_(false), 
+          owned_modules_(std::move(other.owned_modules_)),
+          parameters_(), 
+          submodules_(), 
+          training_(other.training_) {}
     Module& operator=(Module&& other) noexcept {
         if (this != &other) {
             registered_ = false;
+            owned_modules_ = std::move(other.owned_modules_);
             parameters_.clear();
             submodules_.clear();
             training_ = other.training_;
