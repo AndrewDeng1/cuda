@@ -100,7 +100,6 @@ public:
     Tensor mean(int axis, bool keepdims=true) const;
     Tensor variance_squared(int axis, bool keepdims=true) const;
     Tensor pow(float exponent) const;
-    Tensor cross_entropy(const Tensor& y_true, int axis, bool keepdims=true) const;
     Tensor slice(int dim, int start, int end) const;
     Tensor masked_fill(const Tensor& mask, float value) const;
     void backward();
@@ -163,6 +162,9 @@ Tensor randint(int low, int high, const vector<int>& shape, DeviceType device = 
 Tensor randn(const vector<int>& shape, DeviceType device = DeviceType::CPU);  // N(0,1)
 Tensor xavier_normal(const vector<int>& shape, DeviceType device = DeviceType::CPU);   // for tanh/sigmoid/transformers
 Tensor kaiming_normal(const vector<int>& shape, DeviceType device = DeviceType::CPU);  // for ReLU
+Tensor zeros(const vector<int>& shape, DeviceType device = DeviceType::CPU);
+Tensor ones(const vector<int>& shape, DeviceType device = DeviceType::CPU);
+Tensor cross_entropy(const Tensor& logits, const Tensor& targets);  // logits: (N, C) or (..., C), targets: (N,) or (...)
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);

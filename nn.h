@@ -163,6 +163,18 @@ public:
     // No parameters or submodules - default empty implementations
 };
 
+// ReLU activation layer
+class ReLU : public Module {
+public:
+    ReLU() = default;
+    
+    ReLU(ReLU&&) = default;
+    ReLU& operator=(ReLU&&) = default;
+    
+    Tensor forward(const Tensor& x) override;
+    // No parameters or submodules - default empty implementations
+};
+
 // LayerNorm layer
 class LayerNorm : public Module {
 public:

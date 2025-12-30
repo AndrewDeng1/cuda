@@ -1265,94 +1265,6 @@ Tensor softmax(const Tensor& A, int axis) {
     return result;
 }
 
-Tensor Tensor::cross_entropy(const Tensor& y_true, int axis, bool keepdims) const {
-    int actual_axis = axis;
-    if(actual_axis < 0) {
-        actual_axis += impl->shape.size();
-    }
-
-    if(actual_axis >= impl->shape.size() || actual_axis < 0) {
-        throw std::runtime_error("Invalid axis");
-    }
-    
-    vector<int> new_shape;
-    for(int i = 0; i < impl->shape.size(); i++) {
-        if(i == actual_axis) {
-            if(keepdims) {
-                new_shape.push_back(1);
-            }
-        } else {
-            new_shape.push_back(impl->shape[i]);
-        }
-    }
-
-    Tensor result(new_shape, impl->requires_grad, impl->device);
-
-    if(impl->device == DeviceType::CPU) {
-        for(int i = 0; i < result.size(); i++) {
-            int c = -1;
-            
-            float max_val = -FLT_MAX;
-            for(int j = 0; j < impl->shape[actual_axis]; j++) {
-                int curr = i;
-                int idx = 0;
-                for(int x = 0; x < impl->shape.size(); x++) {
-                    if(x == actual_axis) {
-                        idx += j * impl->strides[x];
-                    } else {
-                        idx += (curr / result.impl->strides[x]) * impl->strides[x];
-                    }
-                    curr %= result.impl->strides[x];
-                }
-                max_val = std::max(max_val, impl->at(idx));
-            }
-
-            for(int j = 0; j < impl->shape[actual_axis]; j++) {
-                int curr = i;
-                int idx = 0;
-                for(int x = 0; x < impl->shape.size(); x++) {
-                    if(x == actual_axis) {
-                        idx += j * impl->strides[x];
-                    } else {
-                        idx += (curr / result.impl->strides[x]) * impl->strides[x];
-                    }
-                    curr %= result.impl->strides[x];
-                }
-
-                result.at(i) += exp(impl->at(idx) - max_val);
-
-                if(abs(y_true.at(idx) - 1.0f) <= 1e-5f) {
-                    c = idx;
-                }
-            }
-            if(c == -1) {
-                throw std::runtime_error("Invalid y_true. No '1' found in ground truth vector.");
-            }
-            result.at(i) = log(result.at(i) + 1e-9f) + max_val - impl->at(c);
-        }
-    } else {
-        launch_cross_entropy(*this, y_true, result, actual_axis);
-    }
-
-    if(impl->requires_grad) {
-        shared_ptr<TensorImpl> this_impl = impl;
-        shared_ptr<TensorImpl> y_true_impl = y_true.impl;
-        shared_ptr<TensorImpl> result_impl = result.impl;
-
-        result.impl->parents.push_back(y_true_impl);
-        result.impl->parents.push_back(this_impl);
-        result.impl->backward_fn = [y_true_impl, result_impl, actual_axis, this_impl]() {
-            Tensor this_tensor(this_impl);
-            Tensor y_true(y_true_impl);
-            this_tensor.set_grad(this_tensor.grad() + softmax(this_tensor, actual_axis) - y_true);
-
-            if(y_true_impl->requires_grad) {
-                throw std::runtime_error("y_true requires gradient. This is not supported.");
-            }
-        };
-    }
-    return result;
-}
 
 // TODO: Implement slice + Storage so slice makes new TensorImpl but same Storage just diff view
 Tensor Tensor::slice(int dim, int start, int end) const {
@@ -1744,5 +1656,148 @@ Tensor embedding(const Tensor& weight, const vector<int>& indices) {
     vector<float> indices_float(indices.begin(), indices.end());
     Tensor indices_tensor({(int)indices.size()}, indices_float, false, weight.device());
     return embedding(weight, indices_tensor);
+}
+
+// ============================================================================
+// zeros and ones
+// ============================================================================
+
+Tensor zeros(const vector<int>& shape, DeviceType device) {
+    return Tensor(shape, 0.0f, false, device);
+}
+
+Tensor ones(const vector<int>& shape, DeviceType device) {
+    return Tensor(shape, 1.0f, false, device);
+}
+
+// ============================================================================
+// cross_entropy (free function, PyTorch-style with class indices)
+// ============================================================================
+
+Tensor cross_entropy(const Tensor& logits, const Tensor& targets) {
+    // logits: (N, C) or (..., C) - unnormalized log probabilities
+    // targets: (N,) or (...) - class indices (integers)
+    // Returns: scalar loss (mean over all samples)
+    
+    if(logits.shape().size() < 2) {
+        throw std::runtime_error("cross_entropy: logits must have at least 2 dimensions");
+    }
+    
+    int num_classes = logits.shape().back();
+    int axis = logits.shape().size() - 1;  // Last dimension is classes
+    
+    // Flatten all dimensions except the last (classes) dimension
+    int num_samples = 1;
+    for(int i = 0; i < logits.shape().size() - 1; i++) {
+        num_samples *= logits.shape()[i];
+    }
+    
+    // Verify targets shape matches (should be same as logits without last dim)
+    vector<int> expected_targets_shape = logits.shape();
+    expected_targets_shape.pop_back();
+    
+    if(targets.shape() != expected_targets_shape) {
+        throw std::runtime_error("cross_entropy: targets shape must match logits shape without last dimension");
+    }
+    
+    // Compute softmax along class dimension
+    Tensor probs = softmax(logits, axis);
+    
+    // Reshape to 2D for easier computation: (N, C)
+    Tensor probs_2d = probs.reshape({num_samples, num_classes});
+    
+    // Compute -log(prob[target]) for each sample
+    Tensor losses({num_samples}, logits.requires_grad(), logits.device());
+    
+    if(logits.device() == DeviceType::CPU) {
+        // Iterate over all positions in targets tensor
+        // Convert flat index to multi-dimensional indices for targets
+        for(int sample_flat_idx = 0; sample_flat_idx < num_samples; sample_flat_idx++) {
+            // Convert flat index to multi-dimensional index for targets
+            vector<int> target_indices;
+            int temp = sample_flat_idx;
+            for(int i = expected_targets_shape.size() - 1; i >= 0; i--) {
+                target_indices.insert(target_indices.begin(), temp % expected_targets_shape[i]);
+                temp /= expected_targets_shape[i];
+            }
+            
+            // Get target class index
+            int target_class = (int)targets.at(target_indices);
+            
+            if(target_class < 0 || target_class >= num_classes) {
+                throw std::runtime_error("cross_entropy: target class index out of range");
+            }
+            
+            // Get probability of target class for this sample
+            // Use linear indexing: sample_flat_idx * num_classes + target_class
+            int prob_linear_idx = sample_flat_idx * num_classes + target_class;
+            float prob = probs_2d.at(prob_linear_idx);
+            
+            if(prob <= 0.0f || !std::isfinite(prob)) {
+                throw std::runtime_error("cross_entropy: invalid probability value");
+            }
+            
+            // Store loss
+            losses.at(sample_flat_idx) = -log(prob + 1e-9f);
+        }
+    } else {
+        // TODO: Implement CUDA version
+        throw std::runtime_error("cross_entropy: CUDA not yet implemented for class indices");
+    }
+    
+    // Return mean loss (scalar)
+    // Compute mean manually: sum all losses and divide by num_samples
+    float total_loss = 0.0f;
+    for(int i = 0; i < num_samples; i++) {
+        total_loss += losses.at(i);
+    }
+    Tensor result({1}, {total_loss / num_samples}, logits.requires_grad(), logits.device());
+    
+    // Set up backward pass
+    if(logits.requires_grad()) {
+        shared_ptr<TensorImpl> logits_impl = logits.impl;
+        shared_ptr<TensorImpl> targets_impl = targets.impl;
+        shared_ptr<TensorImpl> probs_impl = probs.impl;
+        shared_ptr<TensorImpl> result_impl = result.impl;
+        
+        result.impl->parents.push_back(logits_impl);
+        result.impl->backward_fn = [logits_impl, targets_impl, probs_impl, result_impl, num_samples, num_classes]() {
+            Tensor logits_tensor(logits_impl);
+            Tensor targets_tensor(targets_impl);
+            Tensor probs_tensor(probs_impl);
+            Tensor result_tensor(result_impl);
+            
+            // Reshape to 2D
+            Tensor targets_1d = targets_tensor.reshape({num_samples});
+            Tensor probs_2d = probs_tensor.reshape({num_samples, num_classes});
+            Tensor logits_2d = logits_tensor.reshape({num_samples, num_classes});
+            
+            // Gradient: (softmax - one_hot) / num_samples
+            Tensor grad_2d = probs_2d;
+            
+            // Subtract one-hot encoding of targets
+            for(int i = 0; i < num_samples; i++) {
+                float target_val = targets_1d.at(i);
+                int target_class = (int)target_val;
+                int grad_linear_idx = i * num_classes + target_class;
+                grad_2d.at(grad_linear_idx) -= 1.0f;
+            }
+            
+            // Scale by 1/num_samples (from mean)
+            grad_2d = grad_2d * (1.0f / num_samples);
+            
+            // Scale by upstream gradient
+            if(result_tensor.has_grad()) {
+                grad_2d = grad_2d * result_tensor.grad().at(0);
+            }
+            
+            // Reshape back to original shape
+            Tensor grad = grad_2d.reshape(logits_tensor.shape());
+            
+            logits_tensor.set_grad(logits_tensor.grad() + grad);
+        };
+    }
+    
+    return result;
 }
 
