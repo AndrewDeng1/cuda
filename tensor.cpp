@@ -1612,6 +1612,37 @@ Tensor randint(int low, int high, const vector<int>& shape, DeviceType device) {
     return result;
 }
 
+Tensor randn(const vector<int>& shape, DeviceType device) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::normal_distribution<float> dist(0.0f, 1.0f);
+    
+    Tensor result(shape, 0.0f, false, device);
+    for(int i = 0; i < result.size(); i++) {
+        result.at(i) = dist(gen);
+    }
+    return result;
+}
+
+Tensor xavier_normal(const vector<int>& shape, DeviceType device) {
+    // Xavier/Glorot normal: std = sqrt(2 / (fan_in + fan_out))
+    // fan_in = shape[-2] (or shape[0] if 1D), fan_out = shape[-1]
+    int ndim = shape.size();
+    int fan_in = (ndim >= 2) ? shape[ndim - 2] : shape[0];
+    int fan_out = shape[ndim - 1];
+    float std_dev = std::sqrt(2.0f / (fan_in + fan_out));
+    return randn(shape, device) * std_dev;
+}
+
+Tensor kaiming_normal(const vector<int>& shape, DeviceType device) {
+    // Kaiming/He normal: std = sqrt(2 / fan_in)
+    // fan_in = shape[-2] (or shape[0] if 1D)
+    int ndim = shape.size();
+    int fan_in = (ndim >= 2) ? shape[ndim - 2] : shape[0];
+    float std_dev = std::sqrt(2.0f / fan_in);
+    return randn(shape, device) * std_dev;
+}
+
 Tensor layer_norm(const Tensor& A, const Tensor& gamma, const Tensor& beta, float epsilon) {
     int axis = A.shape().size() - 1;
     int norm_size = A.shape()[axis];

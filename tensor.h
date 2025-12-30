@@ -160,6 +160,9 @@ Tensor tril(int rows, int cols, DeviceType device = DeviceType::CPU);
 Tensor arange(float start, float end, float step = 1.0f, DeviceType device = DeviceType::CPU);
 Tensor multinomial(const Tensor& probs, int num_samples, bool replacement = false);
 Tensor randint(int low, int high, const vector<int>& shape, DeviceType device = DeviceType::CPU);
+Tensor randn(const vector<int>& shape, DeviceType device = DeviceType::CPU);  // N(0,1)
+Tensor xavier_normal(const vector<int>& shape, DeviceType device = DeviceType::CPU);   // for tanh/sigmoid/transformers
+Tensor kaiming_normal(const vector<int>& shape, DeviceType device = DeviceType::CPU);  // for ReLU
 
 // Global functions
 bool is_broadcastable(const vector<int>& A_shape, const vector<int>& B_shape, bool matmul = false);

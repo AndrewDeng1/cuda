@@ -75,13 +75,13 @@ int main() {
     // Create 3D input tensor (batch_size=2, sequence_length=3, num_classes=4)
     Tensor softmax_input_3d({2, 3, 4}, {
         // Batch 0
-        0.1f, 0.2f, 0.3f, 0.4f,
-        0.5f, 0.6f, 0.7f, 0.8f,
-        0.9f, 1.0f, 1.1f, 1.2f,
+            0.1f, 0.2f, 0.3f, 0.4f,
+            0.5f, 0.6f, 0.7f, 0.8f,
+            0.9f, 1.0f, 1.1f, 1.2f,
         // Batch 1
-        1.3f, 1.4f, 1.5f, 1.6f,
-        1.7f, 1.8f, 1.9f, 2.0f,
-        2.1f, 2.2f, 2.3f, 2.4f
+            1.3f, 1.4f, 1.5f, 1.6f,
+            1.7f, 1.8f, 1.9f, 2.0f,
+            2.1f, 2.2f, 2.3f, 2.4f
     }, true);
 
     cout << "3D Input tensor shape: [" << softmax_input_3d.shape()[0] << ", " 
@@ -133,13 +133,13 @@ int main() {
     // Create 4D input tensor (batch_size=2, channels=3, height=2, width=2)
     Tensor softmax_input_4d({2, 3, 2, 2}, {
         // Batch 0, Channel 0-2
-        0.1f, 0.2f, 0.3f, 0.4f,
-        0.5f, 0.6f, 0.7f, 0.8f,
-        0.9f, 1.0f, 1.1f, 1.2f,
+            0.1f, 0.2f, 0.3f, 0.4f,
+            0.5f, 0.6f, 0.7f, 0.8f,
+            0.9f, 1.0f, 1.1f, 1.2f,
         // Batch 1, Channel 0-2
-        1.3f, 1.4f, 1.5f, 1.6f,
-        1.7f, 1.8f, 1.9f, 2.0f,
-        2.1f, 2.2f, 2.3f, 2.4f
+            1.3f, 1.4f, 1.5f, 1.6f,
+            1.7f, 1.8f, 1.9f, 2.0f,
+            2.1f, 2.2f, 2.3f, 2.4f
     }, true);
 
     cout << "4D Input tensor shape: [" << softmax_input_4d.shape()[0] << ", " 
@@ -155,13 +155,13 @@ int main() {
 
     softmax_output_4d_axis1.set_grad(Tensor({2, 3, 2, 2}, {
         // Batch 0
-        1.0f, 0.0f, 0.0f, 1.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
+            1.0f, 0.0f, 0.0f, 1.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
         // Batch 1
-        0.0f, 1.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        0.0f, 0.0f, 1.0f, 0.0f
+            0.0f, 1.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f, 0.0f
     }));
 
     softmax_output_4d_axis1.backward();
@@ -175,13 +175,13 @@ int main() {
 
     softmax_output_4d_axis2.set_grad(Tensor({2, 3, 2, 2}, {
         // Batch 0
-        1.0f, 1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, 0.0f, 0.0f,
         // Batch 1
-        1.0f, 1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f, 0.0f
+            1.0f, 1.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, 0.0f, 0.0f
     }));
 
     softmax_output_4d_axis2.backward();

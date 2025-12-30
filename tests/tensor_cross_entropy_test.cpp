@@ -63,25 +63,25 @@ int main() {
     
     // (batch=2, sequence=2, classes=3)
     Tensor logits_3d({2, 2, 3}, {
-        // Batch 0, Seq 0
-        1.0f, 2.0f, 3.0f,
-        // Batch 0, Seq 1
-        0.5f, 1.5f, 2.5f,
-        // Batch 1, Seq 0
-        2.0f, 1.0f, 0.0f,
-        // Batch 1, Seq 1
-        3.0f, 2.0f, 1.0f
+            // Batch 0, Seq 0
+            1.0f, 2.0f, 3.0f,
+            // Batch 0, Seq 1
+            0.5f, 1.5f, 2.5f,
+            // Batch 1, Seq 0
+            2.0f, 1.0f, 0.0f,
+            // Batch 1, Seq 1
+            3.0f, 2.0f, 1.0f
     }, true);
 
     Tensor labels_3d({2, 2, 3}, {
-        // Batch 0, Seq 0: class 2
-        0.0f, 0.0f, 1.0f,
-        // Batch 0, Seq 1: class 1
-        0.0f, 1.0f, 0.0f,
-        // Batch 1, Seq 0: class 0
-        1.0f, 0.0f, 0.0f,
-        // Batch 1, Seq 1: class 0
-        1.0f, 0.0f, 0.0f
+            // Batch 0, Seq 0: class 2
+            0.0f, 0.0f, 1.0f,
+            // Batch 0, Seq 1: class 1
+            0.0f, 1.0f, 0.0f,
+            // Batch 1, Seq 0: class 0
+            1.0f, 0.0f, 0.0f,
+            // Batch 1, Seq 1: class 0
+            1.0f, 0.0f, 0.0f
     }, false);
 
     cout << "3D Logits:" << endl;
