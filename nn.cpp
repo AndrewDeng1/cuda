@@ -136,3 +136,29 @@ Tensor Sequential::forward(const Tensor& x) {
     }
     return out;
 }
+
+// ============================================================================
+// Module state_dict and load_state_dict
+// ============================================================================
+
+std::pair<std::vector<std::string>, std::vector<std::string>> Module::load_state_dict(
+    const std::map<std::string, Tensor>& state_dict, bool strict) {
+    
+    ensure_registered();
+    std::vector<std::string> missing_keys;
+    std::vector<std::string> unexpected_keys;
+    
+    // Load recursively and get used keys
+    std::set<std::string> used_keys = load_state_dict_recursive(state_dict, "", missing_keys, strict);
+    
+    // Find unexpected keys (keys in state_dict that weren't used)
+    if (strict) {
+        for (const auto& [key, _] : state_dict) {
+            if (used_keys.find(key) == used_keys.end()) {
+                unexpected_keys.push_back(key);
+            }
+        }
+    }
+    
+    return std::make_pair(missing_keys, unexpected_keys);
+}

@@ -4,6 +4,9 @@
 #include "tensor.h"
 #include <string>
 #include <unordered_map>
+#include <map>
+#include <set>
+#include <vector>
 #include <memory>
 #include <type_traits>
 
@@ -157,6 +160,105 @@ public:
     void eval() { train(false); }
 
     bool is_training() const { return training_; }
+
+    // State dict: returns a map of parameter/buffer names to their tensor values
+    // Follows PyTorch naming scheme: "param_name" or "submodule.param_name"
+    std::map<std::string, Tensor> state_dict() const {
+        ensure_registered();
+        std::map<std::string, Tensor> state;
+        collect_state_dict(state, "");
+        return state;
+    }
+
+    // Load state dict: loads parameter/buffer values from a state dict
+    // Returns a vector of missing keys and a vector of unexpected keys (like PyTorch)
+    std::pair<std::vector<std::string>, std::vector<std::string>> load_state_dict(const std::map<std::string, Tensor>& state_dict, bool strict = true);
+
+protected:
+    // Helper to recursively collect state dict with prefix
+    void collect_state_dict(std::map<std::string, Tensor>& state, const std::string& prefix) const {
+        ensure_registered();
+        
+        // Add parameters
+        for (const auto& [name, param] : parameters_) {
+            std::string full_name = prefix.empty() ? name : prefix + "." + name;
+            state[full_name] = param->tensor();  // Copy the tensor
+        }
+        
+        // Add buffers
+        for (const auto& [name, buffer] : buffers_) {
+            std::string full_name = prefix.empty() ? name : prefix + "." + name;
+            state[full_name] = *buffer;  // Copy the tensor
+        }
+        
+        // Recursively collect from submodules
+        for (const auto& [name, submodule] : submodules_) {
+            std::string submodule_prefix = prefix.empty() ? name : prefix + "." + name;
+            submodule->collect_state_dict(state, submodule_prefix);
+        }
+    }
+
+    // Helper to recursively load state dict with prefix
+    // Returns set of keys that were used
+    std::set<std::string> load_state_dict_recursive(const std::map<std::string, Tensor>& state_dict, 
+                                                     const std::string& prefix,
+                                                     std::vector<std::string>& missing_keys,
+                                                     bool strict) {
+        ensure_registered();
+        std::set<std::string> used_keys;
+        
+        // Load parameters
+        for (const auto& [name, param] : parameters_) {
+            std::string full_name = prefix.empty() ? name : prefix + "." + name;
+            auto it = state_dict.find(full_name);
+            if (it != state_dict.end()) {
+                // Copy the tensor data into the parameter
+                Tensor& param_tensor = param->tensor();
+                if (param_tensor.shape() != it->second.shape()) {
+                    throw std::runtime_error("Shape mismatch when loading state dict for key: " + full_name);
+                }
+                // Copy data element by element
+                for (int i = 0; i < param_tensor.size(); i++) {
+                    param_tensor.at(i) = it->second.at(i);
+                }
+                used_keys.insert(full_name);
+            } else {
+                if (strict) {
+                    missing_keys.push_back(full_name);
+                }
+            }
+        }
+        
+        // Load buffers
+        for (const auto& [name, buffer] : buffers_) {
+            std::string full_name = prefix.empty() ? name : prefix + "." + name;
+            auto it = state_dict.find(full_name);
+            if (it != state_dict.end()) {
+                Tensor* buffer_tensor = buffer;
+                if (buffer_tensor->shape() != it->second.shape()) {
+                    throw std::runtime_error("Shape mismatch when loading state dict for key: " + full_name);
+                }
+                // Copy data element by element
+                for (int i = 0; i < buffer_tensor->size(); i++) {
+                    buffer_tensor->at(i) = it->second.at(i);
+                }
+                used_keys.insert(full_name);
+            } else {
+                if (strict) {
+                    missing_keys.push_back(full_name);
+                }
+            }
+        }
+        
+        // Recursively load from submodules
+        for (const auto& [name, submodule] : submodules_) {
+            std::string submodule_prefix = prefix.empty() ? name : prefix + "." + name;
+            auto submodule_used = submodule->load_state_dict_recursive(state_dict, submodule_prefix, missing_keys, strict);
+            used_keys.insert(submodule_used.begin(), submodule_used.end());
+        }
+        
+        return used_keys;
+    }
 };
 
 // Linear layer: y = xW^T + b
