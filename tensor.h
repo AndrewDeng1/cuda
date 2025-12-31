@@ -110,7 +110,7 @@ public:
 
     // Property accessors
     bool requires_grad() const { return impl->requires_grad; }
-    void set_requires_grad(bool val) { impl->requires_grad = val; }
+    void set_requires_grad(bool val);
     DeviceType device() const { return impl->device; }
     const vector<int>& shape() const { return impl->shape; }
     const vector<int>& strides() const { return impl->strides; }
