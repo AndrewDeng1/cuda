@@ -38,8 +38,10 @@ protected:
         if (!registered_) {
             auto* self = const_cast<Module*>(this);
             self->parameters_.clear();
+            self->buffers_.clear();
             self->submodules_.clear();
             self->register_params();
+            self->register_buffers();
             self->register_submodules();
             registered_ = true;
         }
@@ -48,6 +50,9 @@ protected:
 public:
     // name -> parameter (non-owning pointers)
     std::unordered_map<std::string, Parameter*> parameters_;
+
+    // name -> buffer (non-owning pointers to non-trainable tensors)
+    std::unordered_map<std::string, Tensor*> buffers_;
 
     // name -> child module (non-owning pointers)
     std::unordered_map<std::string, Module*> submodules_;
@@ -68,6 +73,7 @@ public:
         : registered_(false), 
           owned_modules_(std::move(other.owned_modules_)),
           parameters_(), 
+          buffers_(),
           submodules_(), 
           training_(other.training_) {}
     Module& operator=(Module&& other) noexcept {
@@ -75,6 +81,7 @@ public:
             registered_ = false;
             owned_modules_ = std::move(other.owned_modules_);
             parameters_.clear();
+            buffers_.clear();
             submodules_.clear();
             training_ = other.training_;
         }
@@ -91,6 +98,10 @@ public:
         parameters_[name] = p;
     }
 
+    void register_buffer(const std::string& name, Tensor* buffer) {
+        buffers_[name] = buffer;
+    }
+
     void register_module(const std::string& name, Module* m) {
         submodules_[name] = m;
     }
@@ -98,6 +109,7 @@ public:
     // Override these in subclasses to register members
     // Called automatically on first access after construction/move
     virtual void register_params() {}
+    virtual void register_buffers() {}
     virtual void register_submodules() {}
 
     // Recursive parameter collection
@@ -115,6 +127,23 @@ public:
 
         for (auto& [_, m] : submodules_)
             m->collect_parameters(out);  // Recursively collects (and ensures registration)
+    }
+
+    // Recursive buffer collection
+    std::vector<Tensor*> buffers() {
+        ensure_registered();
+        std::vector<Tensor*> out;
+        collect_buffers(out);
+        return out;
+    }
+
+    void collect_buffers(std::vector<Tensor*>& out) {
+        ensure_registered();  // Ensure this module is registered
+        for (auto& [_, b] : buffers_)
+            out.push_back(b);
+
+        for (auto& [_, m] : submodules_)
+            m->collect_buffers(out);  // Recursively collects (and ensures registration)
     }
 
     // Training/eval mode
