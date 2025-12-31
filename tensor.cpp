@@ -313,6 +313,9 @@ Tensor Tensor::grad() const {
 }
 
 void Tensor::set_grad(const Tensor& g) {
+    // Simply set the gradient - g.impl becomes the gradient
+    // Note: g itself doesn't need requires_grad=true to be used as a gradient
+    // The gradient is just data that we store
     impl->grad = g.impl;
 }
 
@@ -460,6 +463,7 @@ Tensor Tensor::sum(int axis, bool keepdims) const {
         
         result.impl->parents.push_back(this_impl);
         result.impl->backward_fn = [this_impl, result_impl]() {
+            cout << "[backward] sum" << endl;
             Tensor this_tensor(this_impl);
             Tensor result_tensor(result_impl);
             this_tensor.set_grad(this_tensor.grad() + result_tensor.grad().broadcast(this_impl->shape));
@@ -576,11 +580,22 @@ Tensor Tensor::broadcast(const vector<int>& new_shape, bool matmul) const {
         
         result.impl->parents.push_back(this_impl);
         result.impl->backward_fn = [this_impl, result_impl]() {
+            cout << "[backward] broadcast" << endl;
             Tensor this_tensor(this_impl);
             Tensor result_tensor(result_impl);
+            if (!result_tensor.requires_grad() || !result_tensor.has_grad()) {
+                cout << "[backward] broadcast: result_tensor requires_grad=" << result_tensor.requires_grad() 
+                     << ", has_grad=" << result_tensor.has_grad() << ", skipping" << endl;
+                return;
+            }
             Tensor reduced_grad = result_tensor.grad().reduce_to_shape(this_impl->shape);
             reduced_grad.impl->requires_grad = false;
-            this_tensor.set_grad(this_tensor.grad() + reduced_grad);
+            if (this_tensor.requires_grad()) {
+                if (!this_tensor.has_grad()) {
+                    this_tensor.set_grad(zeros(this_tensor.shape(), this_tensor.device()));
+                }
+                this_tensor.set_grad(this_tensor.grad() + reduced_grad);
+            }
         };
     }
 
@@ -665,6 +680,7 @@ Tensor operator+(const Tensor& A, const Tensor& B) {
         result.impl->parents.push_back(new_B_impl);
 
         result.impl->backward_fn = [new_A_impl, new_B_impl, result_impl]() {
+            cout << "[backward] operator+" << endl;
             Tensor new_A(new_A_impl);
             Tensor new_B(new_B_impl);
             Tensor result(result_impl);
@@ -712,6 +728,7 @@ Tensor operator-(const Tensor& A, const Tensor& B) {
         result.impl->parents.push_back(new_B_impl);
 
         result.impl->backward_fn = [new_A_impl, new_B_impl, result_impl]() {
+            cout << "[backward] operator-" << endl;
             Tensor new_A(new_A_impl);
             Tensor new_B(new_B_impl);
             Tensor result(result_impl);
@@ -759,6 +776,7 @@ Tensor operator*(const Tensor& A, const Tensor& B) {
         result.impl->parents.push_back(new_B_impl);
 
         result.impl->backward_fn = [new_A_impl, new_B_impl, result_impl]() {
+            cout << "[backward] operator*" << endl;
             Tensor new_A(new_A_impl);
             Tensor new_B(new_B_impl);
             Tensor result(result_impl);
@@ -806,6 +824,7 @@ Tensor operator/(const Tensor& A, const Tensor& B) {
         result.impl->parents.push_back(new_B_impl);
         
         result.impl->backward_fn = [new_A_impl, new_B_impl, result_impl]() {
+            cout << "[backward] operator/" << endl;
             Tensor new_A(new_A_impl);
             Tensor new_B(new_B_impl);
             Tensor result(result_impl);
@@ -956,6 +975,7 @@ Tensor matmul(const Tensor& A, const Tensor& B) {
         result.impl->parents.push_back(new_B_impl);
         
         result.impl->backward_fn = [new_A_impl, new_B_impl, result_impl]() {
+            cout << "[backward] matmul" << endl;
             Tensor new_A(new_A_impl);
             Tensor new_B(new_B_impl);
             Tensor result(result_impl);
@@ -1035,6 +1055,7 @@ Tensor Tensor::transpose(int dim1, int dim2) const {
         result.impl->parents.push_back(this_impl);
 
         result.impl->backward_fn = [actual_dim1, actual_dim2, this_impl, result_impl]() {
+            cout << "[backward] transpose" << endl;
             Tensor this_tensor(this_impl);
             Tensor result_tensor(result_impl);
             this_tensor.set_grad(this_tensor.grad() + result_tensor.grad().transpose(actual_dim1, actual_dim2));
@@ -1061,6 +1082,7 @@ Tensor Tensor::pow(float exponent) const {
         
         result.impl->parents.push_back(this_impl);
         result.impl->backward_fn = [exponent, this_impl, result_impl]() {
+            cout << "[backward] pow" << endl;
             Tensor this_tensor(this_impl);
             Tensor result_tensor(result_impl);
             this_tensor.set_grad(this_tensor.grad() + result_tensor.grad() * exponent * this_tensor.pow(exponent - 1.0f));
@@ -1097,6 +1119,7 @@ Tensor relu(const Tensor& A) {
 
         result.impl->parents.push_back(A_impl);
         result.impl->backward_fn = [A_impl, result_impl]() {
+            cout << "[backward] relu" << endl;
             Tensor A(A_impl);
             Tensor result(result_impl);
             
@@ -1127,6 +1150,7 @@ Tensor sigmoid(const Tensor& A) {
 
         result.impl->parents.push_back(A_impl);
         result.impl->backward_fn = [A_impl, result_impl]() {
+            cout << "[backward] sigmoid" << endl;
             Tensor A(A_impl);
             Tensor result(result_impl);
             A.set_grad(A.grad() + result.grad() * result * (1.0f - result));
@@ -1152,6 +1176,7 @@ Tensor tanh_op(const Tensor& A) {
 
         result.impl->parents.push_back(A_impl);
         result.impl->backward_fn = [A_impl, result_impl]() {
+            cout << "[backward] tanh" << endl;
             Tensor A(A_impl);
             Tensor result(result_impl);
             A.set_grad(A.grad() + result.grad() * (1.0f - result * result));
@@ -1187,6 +1212,7 @@ Tensor dropout(const Tensor& A, float p, bool training) {
 
         result.impl->parents.push_back(A_impl);
         result.impl->backward_fn = [A_impl, result_impl, mask_impl]() {
+            cout << "[backward] dropout" << endl;
             Tensor A(A_impl);
             Tensor result(result_impl);
             Tensor mask(mask_impl);
@@ -1255,6 +1281,7 @@ Tensor softmax(const Tensor& A, int axis) {
 
         result.impl->parents.push_back(A_impl);
         result.impl->backward_fn = [A_impl, result_impl, actual_axis]() {
+            cout << "[backward] softmax" << endl;
             Tensor A(A_impl);
             Tensor result(result_impl);
             Tensor dot = (result * result.grad()).sum(actual_axis, true);
@@ -1303,6 +1330,7 @@ Tensor Tensor::slice(int dim, int start, int end) const {
 
         result.impl->parents.push_back(this_impl);
         result.impl->backward_fn = [this_impl, result_impl, actual_dim, actual_start]() {
+            cout << "[backward] slice" << endl;
             Tensor this_tensor(this_impl);
             Tensor result(result_impl);
             
@@ -1385,6 +1413,7 @@ Tensor cat(const vector<Tensor>& tensors, int axis) {
         shared_ptr<TensorImpl> result_impl = result.impl;
         
         result.impl->backward_fn = [tensor_impls, result_impl, actual_axis]() {
+            cout << "[backward] cat" << endl;
             Tensor result(result_impl);
             int offset = 0;
             for(const auto& t_impl : tensor_impls) {
@@ -1469,6 +1498,7 @@ Tensor Tensor::masked_fill(const Tensor& mask, float value) const {
 
         result.impl->parents.push_back(this_impl);
         result.impl->backward_fn = [this_impl, result_impl, mask_impl]() {
+            cout << "[backward] masked_fill" << endl;
             Tensor this_tensor(this_impl);
             Tensor result(result_impl);
             Tensor mask(mask_impl);
@@ -1635,15 +1665,28 @@ Tensor embedding(const Tensor& weight, const Tensor& indices) {
 
         result.impl->parents.push_back(weight_impl);
         result.impl->backward_fn = [weight_impl, result_impl, indices_impl, embed_dim]() {
+            cout << "[backward] embedding" << endl;
             Tensor weight(weight_impl);
             Tensor result(result_impl);
             Tensor indices(indices_impl);
             
-            for(int idx = 0; idx < result.size(); idx++) {
-                int i = idx / embed_dim;
-                int j = idx % embed_dim;
-                int row = (int)indices.at(i);
-                weight.grad().at(row * embed_dim + j) += result.grad().at(idx);
+            if (!result.requires_grad() || !result.has_grad()) {
+                cout << "[backward] embedding: result_tensor requires_grad=" << result.requires_grad() 
+                     << ", has_grad=" << result.has_grad() << ", skipping" << endl;
+                return;
+            }
+            
+            if (weight.requires_grad()) {
+                if (!weight.has_grad()) {
+                    weight.set_grad(zeros(weight.shape(), weight.device()));
+                }
+                
+                for(int idx = 0; idx < result.size(); idx++) {
+                    int i = idx / embed_dim;
+                    int j = idx % embed_dim;
+                    int row = (int)indices.at(i);
+                    weight.grad().at(row * embed_dim + j) += result.grad().at(idx);
+                }
             }
         };
     }
@@ -1682,6 +1725,9 @@ Tensor cross_entropy(const Tensor& logits, const Tensor& targets) {
     if(logits.shape().size() < 2) {
         throw std::runtime_error("cross_entropy: logits must have at least 2 dimensions");
     }
+
+    cout<<"[ERROR CALC] Running cross_entropy" << endl;
+    cout<<"[ERROR CALC] logits.requires_grad(): " << logits.requires_grad() << endl;
     
     int num_classes = logits.shape().back();
     int axis = logits.shape().size() - 1;  // Last dimension is classes
@@ -1752,6 +1798,8 @@ Tensor cross_entropy(const Tensor& logits, const Tensor& targets) {
         total_loss += losses.at(i);
     }
     Tensor result({1}, {total_loss / num_samples}, logits.requires_grad(), logits.device());
+
+    cout<<"[ERROR CALC] result.requires_grad(): " << result.requires_grad() << endl;
     
     // Set up backward pass
     if(logits.requires_grad()) {
@@ -1762,6 +1810,8 @@ Tensor cross_entropy(const Tensor& logits, const Tensor& targets) {
         
         result.impl->parents.push_back(logits_impl);
         result.impl->backward_fn = [logits_impl, targets_impl, probs_impl, result_impl, num_samples, num_classes]() {
+            cout << "[backward] cross_entropy" << endl;
+            cout<<"[ERROR CALC] Running backward pass on cross_entropy" << endl;
             Tensor logits_tensor(logits_impl);
             Tensor targets_tensor(targets_impl);
             Tensor probs_tensor(probs_impl);
@@ -1795,6 +1845,7 @@ Tensor cross_entropy(const Tensor& logits, const Tensor& targets) {
             Tensor grad = grad_2d.reshape(logits_tensor.shape());
             
             logits_tensor.set_grad(logits_tensor.grad() + grad);
+            cout<<"[ERROR CALC] Backward pass on cross_entropy complete" << endl;
         };
     }
     
