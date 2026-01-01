@@ -4,6 +4,14 @@
 #include "tensor.h"
 using namespace std;
 
+// Tile size for matrix multiplication kernel
+// Using 32x32 tiles: 1024 threads per block (maximum), ~8KB shared memory per block
+// This is optimal for most modern GPUs (compute capability 7.0+)
+#define TILE_SIZE 32
+#define TILE_M TILE_SIZE
+#define TILE_N TILE_SIZE
+#define TILE_K TILE_SIZE
+
 struct TensorStruct {
     int* shape;
     int shape_size;
@@ -591,43 +599,76 @@ void launch_softmax(const Tensor& a, Tensor& sm_exp, Tensor& sm_exp_broadcast, T
     cuda_free_tensor_struct(d_b_struct);
 }
 
-// TODO: Implement with tiling
 __global__ void matmul_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
-    int ind_A = 0;
-    int ind_B = 0;
-    int curr_A = idx;
-    int curr_B = idx;
+    // threadIdx.y == row within tile
+    // threadIdx.x == column within tile
 
-    // Gets you to dimension before 2D
-    for(int j=0; j<a.shape_size-2; j++){
-        ind_A += (curr_A/c.strides[j])*a.strides[j];
-        curr_A%=c.strides[j];
+    // TILE_N == TILE_M == TILE_K == TILE_SIZE
+
+    int row = threadIdx.y + blockIdx.y * TILE_M;
+    int col = threadIdx.x + blockIdx.x * TILE_N;
+
+    __shared__ float As[TILE_M][TILE_K];
+    __shared__ float Bs[TILE_K][TILE_N];
+
+    int batch_idx = blockIdx.z;
+
+    int M = c.shape[c.shape_size-2];
+    int N = c.shape[c.shape_size-1];
+    int K = a.shape[a.shape_size-1];
+
+    int batch_offset_A = 0;
+    int batch_offset_B = 0;
+    int batch_offset_C = 0;
+
+    for(int i=0; i<c.strides_size-2; i++){
+        batch_offset_A+=(batch_idx/c.strides[i])*a.strides[i];
+        batch_offset_B+=(batch_idx/c.strides[i])*b.strides[i];
+        batch_offset_C+=(batch_idx/c.strides[i])*c.strides[i];
+        batch_idx%=c.strides[i];
     }
 
-    // Get corresponding row
-    ind_A += (curr_A/c.strides[c.strides_size-2])*a.strides[a.strides_size-2];
-    
-    // Ignore column
-    curr_A%=c.strides[c.strides_size-1];
-    
-    // Gets you to dimension before 2D
-    for(int j=0; j<b.shape_size-2; j++){
-        ind_B += (curr_B/c.strides[j])*b.strides[j];
-        curr_B%=c.strides[j];
+    // Accumulated dot product value eventually placed at [threadIdx.y][threadIdx.x]
+    float acc=0.0f;
+
+    // At each iteration copies tile from A and B to shared memory, syncs, performs partial dot product, accumulates
+    for(int k0=0; k0<K; k0+=TILE_K){
+
+        if(row<M&&(k0+threadIdx.x)<K){
+            As[threadIdx.y][threadIdx.x]=a.data[
+                batch_offset_A+
+                row*a.strides[a.strides_size-2]+
+                (k0+threadIdx.x)*a.strides[a.strides_size-1];
+            ];
+        } else {
+            As[threadIdx.y][threadIdx.x]=0.0f;
+        }
+
+        if((k0+threadIdx.y)<K&&col<N){
+            Bs[threadIdx.y][threadIdx.x]=b.data[
+                batch_offset_B+
+                (k0+threadIdx.y)*b.strides[b.strides_size-2]+
+                col*b.strides[b.strides_size-1];
+            ]
+        } else {
+            Bs[threadIdx.y][threadIdx.x]=0.0f;
+        }
+
+        __syncthreads();
+
+        for(int k=0; k<TILE_K; k++){
+            acc+=As[threadIdx.y][k]*Bs[k][threadIdx.x];
+        }
+
+        __syncthreads();
     }
 
-    // Ignore row
-    curr_B%=c.strides[c.strides_size-2];
-    
-    // Get corresponding column
-    ind_B += (curr_B/c.strides[c.strides_size-1])*b.strides[b.strides_size-1];
-    
-    for(int j=0; j<a.shape[a.shape_size-1]; j++){
-        c.data[idx] += a.data[ind_A]*b.data[ind_B];
-        ind_A += a.strides[a.strides_size-1];
-        ind_B += b.strides[b.strides_size-2];
+    if(row<M&&col<N){
+        c.data[
+            batch_offset_C+
+            row*c.strides[c.strides_size-2]+
+            col*c.strides[c.strides_size-1]
+        ]=acc;
     }
 }
 
@@ -649,7 +690,22 @@ void launch_matmul(const Tensor& a, const Tensor& b, Tensor& c){
     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
     cuda_memcpy_tensor_struct(d_c_struct, c_struct, cudaMemcpyHostToDevice);
 
-    matmul_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, d_c_struct);
+    int M = c.shape()[c.shape().size()-2];
+    int N = c.shape()[c.shape().size()-1];
+
+    int batch=1;
+    for(int i=0; i<c.shape().size()-2; i++){
+        batch*=c.shape()[i];
+    }
+
+    dim3 block(TILE_N, TILE_M);
+    dim3 grid(
+        (N+TILE_N-1)/TILE_N,
+        (M+TILE_M-1)/TILE_M,
+        batch
+    );
+
+    matmul_kernel<<<grid, block>>>(d_a_struct, d_b_struct, d_c_struct);
     cudaDeviceSynchronize();
     
     cuda_memcpy_tensor_struct(c_struct, d_c_struct, cudaMemcpyDeviceToHost);
@@ -659,14 +715,88 @@ void launch_matmul(const Tensor& a, const Tensor& b, Tensor& c){
     cuda_free_tensor_struct(d_c_struct);
 }
 
+// NON-TILING MATMUL KERNEL
+// __global__ void matmul_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
+//     int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    
+//     int ind_A = 0;
+//     int ind_B = 0;
+//     int curr_A = idx;
+//     int curr_B = idx;
+
+//     // Gets you to dimension before 2D
+//     for(int j=0; j<a.shape_size-2; j++){
+//         ind_A += (curr_A/c.strides[j])*a.strides[j];
+//         curr_A%=c.strides[j];
+//     }
+
+//     // Get corresponding row
+//     ind_A += (curr_A/c.strides[c.strides_size-2])*a.strides[a.strides_size-2];
+    
+//     // Ignore column
+//     curr_A%=c.strides[c.strides_size-1];
+    
+//     // Gets you to dimension before 2D
+//     for(int j=0; j<b.shape_size-2; j++){
+//         ind_B += (curr_B/c.strides[j])*b.strides[j];
+//         curr_B%=c.strides[j];
+//     }
+
+//     // Ignore row
+//     curr_B%=c.strides[c.strides_size-2];
+    
+//     // Get corresponding column
+//     ind_B += (curr_B/c.strides[c.strides_size-1])*b.strides[b.strides_size-1];
+    
+//     for(int j=0; j<a.shape[a.shape_size-1]; j++){
+//         c.data[idx] += a.data[ind_A]*b.data[ind_B];
+//         ind_A += a.strides[a.strides_size-1];
+//         ind_B += b.strides[b.strides_size-2];
+//     }
+// }
+
+// NON-TILING MATMUL LAUNCH FUNCTION
+// void launch_matmul(const Tensor& a, const Tensor& b, Tensor& c){
+//     TensorStruct a_struct(a);
+//     TensorStruct b_struct(b);
+//     TensorStruct c_struct(c);
+//     int N = c.size();
+
+//     TensorStruct d_a_struct(false);
+//     TensorStruct d_b_struct(false);
+//     TensorStruct d_c_struct(false);
+    
+//     cuda_malloc_tensor_struct(d_a_struct, a_struct);
+//     cuda_malloc_tensor_struct(d_b_struct, b_struct);
+//     cuda_malloc_tensor_struct(d_c_struct, c_struct);
+    
+//     cuda_memcpy_tensor_struct(d_a_struct, a_struct, cudaMemcpyHostToDevice);
+//     cuda_memcpy_tensor_struct(d_b_struct, b_struct, cudaMemcpyHostToDevice);
+//     cuda_memcpy_tensor_struct(d_c_struct, c_struct, cudaMemcpyHostToDevice);
+
+//     matmul_kernel<<<(N+255)/256, 256>>>(d_a_struct, d_b_struct, d_c_struct);
+//     cudaDeviceSynchronize();
+    
+//     cuda_memcpy_tensor_struct(c_struct, d_c_struct, cudaMemcpyDeviceToHost);
+
+//     cuda_free_tensor_struct(d_a_struct);
+//     cuda_free_tensor_struct(d_b_struct);
+//     cuda_free_tensor_struct(d_c_struct);
+// }
+
 __global__ void cross_entropy_kernel(TensorStruct logits, TensorStruct y_true, TensorStruct result, int axis){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     
     if(idx >= result.data_size) return;
 
+    // Get target class index from y_true (class indices, not one-hot)
+    // y_true has same shape as result (logits shape without last dimension)
+    int target_class = (int)y_true.data[idx];
+    int num_classes = logits.shape[axis];
+
     // First pass: find max value along axis for numerical stability
     float max_val = -FLT_MAX;
-    for(int j=0; j<logits.shape[axis]; j++){
+    for(int j=0; j<num_classes; j++){
         int curr = idx;
         int logit_idx = 0;
         for(int x=0; x<logits.shape_size; x++){
@@ -682,10 +812,10 @@ __global__ void cross_entropy_kernel(TensorStruct logits, TensorStruct y_true, T
         }
     }
 
-    // Second pass: compute sum of exp(x - max) and find correct class
+    // Second pass: compute sum of exp(x - max) and get probability of target class
     float sum_exp = 0.0f;
-    int correct_idx = -1;
-    for(int j=0; j<logits.shape[axis]; j++){
+    float target_logit = 0.0f;
+    for(int j=0; j<num_classes; j++){
         int curr = idx;
         int logit_idx = 0;
         for(int x=0; x<logits.shape_size; x++){
@@ -697,16 +827,20 @@ __global__ void cross_entropy_kernel(TensorStruct logits, TensorStruct y_true, T
             curr %= result.strides[x];
         }
 
-        sum_exp += expf(logits.data[logit_idx] - max_val);
+        float exp_val = expf(logits.data[logit_idx] - max_val);
+        sum_exp += exp_val;
 
-        // Check if this is the correct class (y_true == 1)
-        if(fabsf(y_true.data[logit_idx] - 1.0f) <= 1e-5f){
-            correct_idx = logit_idx;
+        // Get the logit value for the target class
+        if(j == target_class){
+            target_logit = logits.data[logit_idx];
         }
     }
 
-    // Compute cross entropy: log(sum_exp) + max - logit[correct_class]
-    result.data[idx] = logf(sum_exp + 1e-9f) + max_val - logits.data[correct_idx];
+    // Compute probability of target class: exp(target_logit - max) / sum_exp
+    float target_prob = expf(target_logit - max_val) / (sum_exp + 1e-9f);
+
+    // Compute cross entropy: -log(prob[target_class])
+    result.data[idx] = -logf(target_prob + 1e-9f);
 }
 
 void launch_cross_entropy(const Tensor& logits, const Tensor& y_true, Tensor& result, int axis){
