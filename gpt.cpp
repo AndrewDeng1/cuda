@@ -32,7 +32,7 @@ const int n_layer = 2;
 // const int n_layer = 3;
 const float dropout_p = 0.2f;
 
-const string checkpoint_file = "checkpoint_iter_30.safetensors"
+const string checkpoint_file = "checkpoint_iter_30.safetensors";
 const bool save_checkpoint = true;
 const bool load_checkpoint = true;
 
@@ -669,62 +669,62 @@ int main(int argc, char* argv[]) {
     // Create optimizer
     AdamW optimizer(params, learning_rate, 0.9f, 0.999f, 1e-8f, 0.0f);
 
-    // Training loop
-    for(int iter = 0; iter < max_iters; iter++) {
-        cout << "\n=== Iteration " << iter << " ===" << endl;
+    // // Training loop
+    // for(int iter = 0; iter < max_iters; iter++) {
+    //     cout << "\n=== Iteration " << iter << " ===" << endl;
         
-        // Evaluate
-        if(iter % eval_interval == 0 || iter == max_iters - 1) {
-            // cout << "[Main] Estimating loss..." << endl;
-            auto losses = estimate_loss(model);
-            cout << "step " << iter << ": train loss " << losses["train"] << ", val loss " << losses["val"] << endl;
-        }
+    //     // Evaluate
+    //     if(iter % eval_interval == 0 || iter == max_iters - 1) {
+    //         // cout << "[Main] Estimating loss..." << endl;
+    //         auto losses = estimate_loss(model);
+    //         cout << "step " << iter << ": train loss " << losses["train"] << ", val loss " << losses["val"] << endl;
+    //     }
 
-        // Save checkpoint if enabled
-        if(save_checkpoint) {
-            if(iter % save_iters == 0 || iter == max_iters - 1) {
-                string checkpoint_name = "checkpoint_iter_" + to_string(iter) + ".safetensors";
-                auto state_dict = model.state_dict();
-                write_safe_tensors(state_dict, checkpoint_name);
-            }
-        }
+    //     // Save checkpoint if enabled
+    //     if(save_checkpoint) {
+    //         if(iter % save_iters == 0 || iter == max_iters - 1) {
+    //             string checkpoint_name = "checkpoint_iter_" + to_string(iter) + ".safetensors";
+    //             auto state_dict = model.state_dict();
+    //             write_safe_tensors(state_dict, checkpoint_name);
+    //         }
+    //     }
 
-        // Sample batch
-        // cout << "[Main] Getting batch..." << endl;
-        auto [xb, yb] = get_batch("train");
-        // cout << "[Main] xb shape: [";
-        // for(int i = 0; i < xb.shape().size(); i++) {
-        //     cout << xb.shape()[i];
-        //     if(i < xb.shape().size() - 1) cout << ", ";
-        // }
-        // cout << "]" << endl;
-        // cout << "[Main] yb shape: [";
-        // for(int i = 0; i < yb.shape().size(); i++) {
-        //     cout << yb.shape()[i];
-        //     if(i < yb.shape().size() - 1) cout << ", ";
-        // }
-        // cout << "]" << endl;
+    //     // Sample batch
+    //     // cout << "[Main] Getting batch..." << endl;
+    //     auto [xb, yb] = get_batch("train");
+    //     // cout << "[Main] xb shape: [";
+    //     // for(int i = 0; i < xb.shape().size(); i++) {
+    //     //     cout << xb.shape()[i];
+    //     //     if(i < xb.shape().size() - 1) cout << ", ";
+    //     // }
+    //     // cout << "]" << endl;
+    //     // cout << "[Main] yb shape: [";
+    //     // for(int i = 0; i < yb.shape().size(); i++) {
+    //     //     cout << yb.shape()[i];
+    //     //     if(i < yb.shape().size() - 1) cout << ", ";
+    //     // }
+    //     // cout << "]" << endl;
 
-        // Forward pass
-        // cout << "[Main] Starting forward pass..." << endl;
-        try {
-            auto [logits, loss] = model.forward_with_targets(xb, &yb);
-            // cout << "[Main] Forward pass complete" << endl;
+    //     // Forward pass
+    //     // cout << "[Main] Starting forward pass..." << endl;
+    //     try {
+    //         auto [logits, loss] = model.forward_with_targets(xb, &yb);
+    //         // cout << "[Main] Forward pass complete" << endl;
 
-            // Backward pass
-            // cout << "[Main] Starting backward pass..." << endl;
-            optimizer.zero_grad();
-            loss.set_grad(ones({1}));
-            // cout << "[Main] Loss gradient: " << loss.grad().at(0) << endl;
-            loss.backward();
-            // cout << "[Main] Backward pass complete, calling optimizer.step()" << endl;
-            optimizer.step();
-            // cout << "[Main] Optimizer step complete" << endl;
-        } catch(const exception& e) {
-            cerr << "[Main] ERROR in iteration " << iter << ": " << e.what() << endl;
-            throw;
-        }
-    }
+    //         // Backward pass
+    //         // cout << "[Main] Starting backward pass..." << endl;
+    //         optimizer.zero_grad();
+    //         loss.set_grad(ones({1}));
+    //         // cout << "[Main] Loss gradient: " << loss.grad().at(0) << endl;
+    //         loss.backward();
+    //         // cout << "[Main] Backward pass complete, calling optimizer.step()" << endl;
+    //         optimizer.step();
+    //         // cout << "[Main] Optimizer step complete" << endl;
+    //     } catch(const exception& e) {
+    //         cerr << "[Main] ERROR in iteration " << iter << ": " << e.what() << endl;
+    //         throw;
+    //     }
+    // }
 
     // Generate - start with zeros context like PyTorch: torch.zeros((1, 1), dtype=torch.long)
     // Create a tensor with shape (1, 1) containing 0 (first token index)
