@@ -391,4 +391,13 @@ public:
     void register_submodules() override;
 };
 
+// Write state dict to safetensors format
+// Format: [8 bytes: header_len (u64 LE)] [header JSON] [tensor data...]
+// NOTE: Once "num bytes" parameter and multiple dtype options for Tensor implemented, change how it's saved
+// NOTE: Make sure write + save compatible with format of PyTorch, consider making default Module names consistent with PyTorch naming scheme
+void write_safe_tensors(const std::map<std::string, Tensor>& state_dict, const std::string& filename);
+
+// Load state dict from safetensors format
+std::map<std::string, Tensor> load_safe_tensors(const std::string& filename);
+
 #endif // NN_H

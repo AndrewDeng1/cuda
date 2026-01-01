@@ -17,10 +17,11 @@ using namespace std;
 // Hyperparameters
 const int batch_size = 32;
 const int block_size = 64;
-const int max_iters = 20;
+const int max_iters = 40;
 // const int max_iters = 3000;
 // const int eval_interval = 300;
 const int eval_interval = 100;
+const int save_iters = 5;  // Save checkpoint every N iterations
 const float learning_rate = 1e-3f;
 // const int eval_iters = 50;
 const int eval_iters = 1;
@@ -30,6 +31,10 @@ const int n_layer = 2;
 // const int n_head = 4;
 // const int n_layer = 3;
 const float dropout_p = 0.2f;
+
+const string checkpoint_file = "checkpoint_iter_30.safetensors"
+const bool save_checkpoint = true;
+const bool load_checkpoint = true;
 
 // Global variables
 int vocab_size;
@@ -626,6 +631,33 @@ int main(int argc, char* argv[]) {
     // Create model
     GPTLanguageModel model;
     
+    // Load checkpoint if it exists
+    if (load_checkpoint) {
+        ifstream check_file(checkpoint_file);
+        if (check_file.good()) {
+            check_file.close();
+            cout << "Loading checkpoint from " << checkpoint_file << "..." << endl;
+            auto loaded_state_dict = load_safe_tensors(checkpoint_file);
+            auto [missing_keys, unexpected_keys] = model.load_state_dict(loaded_state_dict, true);
+            
+            if (!missing_keys.empty()) {
+                cout << "Warning: Missing keys when loading checkpoint:" << endl;
+                for (const auto& key : missing_keys) {
+                    cout << "  - " << key << endl;
+                }
+            }
+            if (!unexpected_keys.empty()) {
+                cout << "Warning: Unexpected keys when loading checkpoint:" << endl;
+                for (const auto& key : unexpected_keys) {
+                    cout << "  - " << key << endl;
+                }
+            }
+            cout << "Checkpoint loaded successfully!" << endl;
+        } else {
+            cout << "No checkpoint found at " << checkpoint_file << ", starting from scratch" << endl;
+        }
+    }
+    
     // Count parameters
     auto params = model.parameters();
     int total_params = 0;
@@ -646,6 +678,15 @@ int main(int argc, char* argv[]) {
             // cout << "[Main] Estimating loss..." << endl;
             auto losses = estimate_loss(model);
             cout << "step " << iter << ": train loss " << losses["train"] << ", val loss " << losses["val"] << endl;
+        }
+
+        // Save checkpoint if enabled
+        if(save_checkpoint) {
+            if(iter % save_iters == 0 || iter == max_iters - 1) {
+                string checkpoint_name = "checkpoint_iter_" + to_string(iter) + ".safetensors";
+                auto state_dict = model.state_dict();
+                write_safe_tensors(state_dict, checkpoint_name);
+            }
         }
 
         // Sample batch
@@ -715,7 +756,7 @@ int main(int argc, char* argv[]) {
     // Reset context for longer generation
     Tensor context_long({1, 1}, {0.0f}, false);
     // Tensor generated_long = model.generate(context_long, 10000);
-    Tensor generated_long = model.generate(context_long, 10);
+    Tensor generated_long = model.generate(context_long, 50);
     
     vector<int> generated_long_vec;
     B = generated_long.shape()[0];

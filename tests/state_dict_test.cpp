@@ -153,6 +153,10 @@ int main() {
         cout << "\n3. Saving state_dict to JSON..." << endl;
         save_state_dict_to_json(state_dict, "sample_gpt_state_dict.json");
         
+        // Save to safetensors
+        cout << "\n3b. Saving state_dict to safetensors..." << endl;
+        write_safe_tensors(state_dict, "sample_gpt_state_dict.safetensors");
+        
         // Test load_state_dict by creating a new model and loading
         cout << "\n4. Testing load_state_dict()..." << endl;
         SimpleGPT model2;
