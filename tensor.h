@@ -28,10 +28,10 @@ class TensorImpl : public enable_shared_from_this<TensorImpl> {
 public:
     // Constructors
     TensorImpl();
-    TensorImpl(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    TensorImpl(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    TensorImpl(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    TensorImpl(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    TensorImpl(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    TensorImpl(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    TensorImpl(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    TensorImpl(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
     TensorImpl(shared_ptr<TensorImpl> other);
 
     // Big 5
@@ -66,14 +66,14 @@ public:
     // Constructors
     Tensor();
     Tensor(shared_ptr<TensorImpl> impl);  // Wrap existing impl
-    Tensor(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    Tensor(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    Tensor(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    Tensor(const vector<int>& shape, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    Tensor(const vector<int>& shape, const vector<float>& data, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    Tensor(const vector<int>& shape, float* data, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    Tensor(const vector<int>& shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
     // Initializer list constructors for cleaner syntax
-    Tensor(initializer_list<int> shape, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    Tensor(initializer_list<int> shape, initializer_list<float> data, bool requires_grad=false, DeviceType device=DeviceType::CPU);
-    Tensor(initializer_list<int> shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CPU);
+    Tensor(initializer_list<int> shape, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    Tensor(initializer_list<int> shape, initializer_list<float> data, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
+    Tensor(initializer_list<int> shape, float num, bool requires_grad=false, DeviceType device=DeviceType::CUDA);
 
     // Big 5
     ~Tensor() = default;                            // Destructor (shared_ptr handles cleanup)
@@ -155,15 +155,15 @@ Tensor stack(const vector<Tensor>& tensors, int axis = 0);
 Tensor layer_norm(const Tensor& A, const Tensor& gamma, const Tensor& beta, float epsilon = 1e-5f);
 Tensor embedding(const Tensor& weight, const Tensor& indices);
 Tensor embedding(const Tensor& weight, const vector<int>& indices);
-Tensor tril(int rows, int cols, DeviceType device = DeviceType::CPU);
-Tensor arange(float start, float end, float step = 1.0f, DeviceType device = DeviceType::CPU);
+Tensor tril(int rows, int cols, DeviceType device = DeviceType::CUDA);
+Tensor arange(float start, float end, float step = 1.0f, DeviceType device = DeviceType::CUDA);
 Tensor multinomial(const Tensor& probs, int num_samples, bool replacement = false);
-Tensor randint(int low, int high, const vector<int>& shape, DeviceType device = DeviceType::CPU);
-Tensor randn(const vector<int>& shape, DeviceType device = DeviceType::CPU);  // N(0,1)
-Tensor xavier_normal(const vector<int>& shape, DeviceType device = DeviceType::CPU);   // for tanh/sigmoid/transformers
-Tensor kaiming_normal(const vector<int>& shape, DeviceType device = DeviceType::CPU);  // for ReLU
-Tensor zeros(const vector<int>& shape, DeviceType device = DeviceType::CPU);
-Tensor ones(const vector<int>& shape, DeviceType device = DeviceType::CPU);
+Tensor randint(int low, int high, const vector<int>& shape, DeviceType device = DeviceType::CUDA);
+Tensor randn(const vector<int>& shape, DeviceType device = DeviceType::CUDA);  // N(0,1)
+Tensor xavier_normal(const vector<int>& shape, DeviceType device = DeviceType::CUDA);   // for tanh/sigmoid/transformers
+Tensor kaiming_normal(const vector<int>& shape, DeviceType device = DeviceType::CUDA);  // for ReLU
+Tensor zeros(const vector<int>& shape, DeviceType device = DeviceType::CUDA);
+Tensor ones(const vector<int>& shape, DeviceType device = DeviceType::CUDA);
 Tensor cross_entropy(const Tensor& logits, const Tensor& targets);  // logits: (N, C) or (..., C), targets: (N,) or (...)
 
 // Global functions

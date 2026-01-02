@@ -1762,7 +1762,7 @@ Tensor cross_entropy(const Tensor& logits, const Tensor& targets) {
     Tensor probs_2d = probs.reshape({num_samples, num_classes});
     
     // Compute -log(prob[target]) for each sample
-    Tensor losses({num_samples}, logits.requires_grad(), logits.device());
+    Tensor losses(expected_targets_shape, logits.requires_grad(), logits.device());
     
     if(logits.device() == DeviceType::CPU) {
         // Iterate over all positions in targets tensor
@@ -1793,11 +1793,10 @@ Tensor cross_entropy(const Tensor& logits, const Tensor& targets) {
             }
             
             // Store loss
-            losses.at(sample_flat_idx) = -log(prob + 1e-9f);
+            losses.at(target_indices) = -log(prob + 1e-9f);
         }
     } else {
-        // TODO: Implement CUDA version
-        throw std::runtime_error("cross_entropy: CUDA not yet implemented for class indices");
+        launch_cross_entropy(logits, targets, losses, axis);
     }
     
     // Return mean loss (scalar)

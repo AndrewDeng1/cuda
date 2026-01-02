@@ -617,16 +617,18 @@ __global__ void matmul_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
     int N = c.shape[c.shape_size-1];
     int K = a.shape[a.shape_size-1];
 
-    int batch_offset_A = 0;
-    int batch_offset_B = 0;
-    int batch_offset_C = 0;
-
-    for(int i=0; i<c.strides_size-2; i++){
-        batch_offset_A+=(batch_idx/c.strides[i])*a.strides[i];
-        batch_offset_B+=(batch_idx/c.strides[i])*b.strides[i];
-        batch_offset_C+=(batch_idx/c.strides[i])*c.strides[i];
-        batch_idx%=c.strides[i];
-    }
+    // Compute batch strides (product of last 2 dims)
+    int a_batch_stride = (a.strides_size >= 2) ? a.strides[a.strides_size-2] * a.shape[a.shape_size-2] : 0;
+    int b_batch_stride = (b.strides_size >= 2) ? b.strides[b.strides_size-2] * b.shape[b.shape_size-2] : 0;
+    int c_batch_stride = (c.strides_size >= 2) ? c.strides[c.strides_size-2] * c.shape[c.shape_size-2] : 0;
+    
+    // A may have batch dims, B may not (broadcasting)
+    int a_batch_dims = a.shape_size - 2;
+    int b_batch_dims = b.shape_size - 2;
+    
+    int batch_offset_A = (a_batch_dims > 0) ? batch_idx * a_batch_stride : 0;
+    int batch_offset_B = (b_batch_dims > 0) ? batch_idx * b_batch_stride : 0;
+    int batch_offset_C = batch_idx * c_batch_stride;
 
     // Accumulated dot product value eventually placed at [threadIdx.y][threadIdx.x]
     float acc=0.0f;
@@ -638,7 +640,7 @@ __global__ void matmul_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
             As[threadIdx.y][threadIdx.x]=a.data[
                 batch_offset_A+
                 row*a.strides[a.strides_size-2]+
-                (k0+threadIdx.x)*a.strides[a.strides_size-1];
+                (k0+threadIdx.x)*a.strides[a.strides_size-1]
             ];
         } else {
             As[threadIdx.y][threadIdx.x]=0.0f;
@@ -648,8 +650,8 @@ __global__ void matmul_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
             Bs[threadIdx.y][threadIdx.x]=b.data[
                 batch_offset_B+
                 (k0+threadIdx.y)*b.strides[b.strides_size-2]+
-                col*b.strides[b.strides_size-1];
-            ]
+                col*b.strides[b.strides_size-1]
+            ];
         } else {
             Bs[threadIdx.y][threadIdx.x]=0.0f;
         }
@@ -676,8 +678,6 @@ void launch_matmul(const Tensor& a, const Tensor& b, Tensor& c){
     TensorStruct a_struct(a);
     TensorStruct b_struct(b);
     TensorStruct c_struct(c);
-    int N = c.size();
-
     TensorStruct d_a_struct(false);
     TensorStruct d_b_struct(false);
     TensorStruct d_c_struct(false);
@@ -799,13 +799,18 @@ __global__ void cross_entropy_kernel(TensorStruct logits, TensorStruct y_true, T
     for(int j=0; j<num_classes; j++){
         int curr = idx;
         int logit_idx = 0;
+        // Map result index to logits index
+        // result has same shape as logits except without the axis dimension
         for(int x=0; x<logits.shape_size; x++){
             if(x == axis){
                 logit_idx += j * logits.strides[x];
             } else {
-                logit_idx += (curr / result.strides[x]) * logits.strides[x];
+                // Map dimension x: result has dimension x (since it's before axis or after but shifted)
+                // Need to find which dimension in result corresponds to dimension x in logits
+                int result_dim = (x < axis) ? x : x - 1;
+                logit_idx += (curr / result.strides[result_dim]) * logits.strides[x];
+                curr %= result.strides[result_dim];
             }
-            curr %= result.strides[x];
         }
         if(logits.data[logit_idx] > max_val){
             max_val = logits.data[logit_idx];
@@ -822,9 +827,10 @@ __global__ void cross_entropy_kernel(TensorStruct logits, TensorStruct y_true, T
             if(x == axis){
                 logit_idx += j * logits.strides[x];
             } else {
-                logit_idx += (curr / result.strides[x]) * logits.strides[x];
+                int result_dim = (x < axis) ? x : x - 1;
+                logit_idx += (curr / result.strides[result_dim]) * logits.strides[x];
+                curr %= result.strides[result_dim];
             }
-            curr %= result.strides[x];
         }
 
         float exp_val = expf(logits.data[logit_idx] - max_val);
