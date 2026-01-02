@@ -1,8 +1,8 @@
 NVCC = nvcc
-NVCC_FLAGS = -std=c++17
+NVCC_FLAGS = -std=c++17 -Xcompiler -std=c++17
 TARGET = tensor_test
 CUDA_SRC = tensor_kernels.cu
-CPP_SRC = tensor.cpp nn.cpp main.cpp
+CPP_SRC = tensor.cpp nn.cpp optim.cpp main.cpp
 CUDA_OBJ = tensor_kernels.o
 
 all: $(TARGET)
@@ -14,4 +14,4 @@ $(TARGET): $(CUDA_OBJ) $(CPP_SRC)
 	$(NVCC) $(NVCC_FLAGS) $(CPP_SRC) $(CUDA_OBJ) -o $(TARGET)
 
 clean:
-	-del /Q $(CUDA_OBJ) $(TARGET).exe $(TARGET).lib $(TARGET).exp 2>nul
+	rm -f $(CUDA_OBJ) $(TARGET) $(TARGET).exe $(TARGET).lib $(TARGET).exp

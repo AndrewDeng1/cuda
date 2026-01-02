@@ -5,13 +5,29 @@
 #include <iostream>
 #include <cmath>
 #include <cassert>
-#include <functional>
 #include <memory>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
 
+// If compiling without CUDA
+#ifndef __CUDACC__
+#include <functional>
+#endif
+
 using namespace std;
+
+// std::function isn't available in CUDA device code, so backward_fn needs special behavior
+#ifdef __CUDACC__
+// For CUDA compilation, use a placeholder type
+// backward_fn is never accessed in CUDA code
+struct BackwardFnPlaceholder {
+    char dummy;
+};
+typedef BackwardFnPlaceholder BackwardFnType;
+#else
+typedef function<void()> BackwardFnType;
+#endif
 
 enum class DeviceType {
     CPU,
@@ -55,7 +71,7 @@ public:
     float* data;
     shared_ptr<TensorImpl> grad;  // grad is now TensorImpl
     vector<shared_ptr<TensorImpl>> parents;  // parents are TensorImpl
-    function<void()> backward_fn;
+    BackwardFnType backward_fn;
 };
 
 // Tensor is a wrapper around TensorImpl

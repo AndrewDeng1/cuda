@@ -17,11 +17,11 @@ using namespace std;
 // Hyperparameters
 const int batch_size = 32;
 const int block_size = 64;
-const int max_iters = 40;
+const int max_iters = 100;
 // const int max_iters = 3000;
 // const int eval_interval = 300;
 const int eval_interval = 100;
-const int save_iters = 5;  // Save checkpoint every N iterations
+const int save_iters = 10;  // Save checkpoint every N iterations
 const float learning_rate = 1e-3f;
 // const int eval_iters = 50;
 const int eval_iters = 1;
@@ -756,7 +756,7 @@ int main(int argc, char* argv[]) {
     // Reset context for longer generation
     Tensor context_long({1, 1}, {0.0f}, false);
     // Tensor generated_long = model.generate(context_long, 10000);
-    Tensor generated_long = model.generate(context_long, 50);
+    Tensor generated_long = model.generate(context_long, 200);
     
     vector<int> generated_long_vec;
     B = generated_long.shape()[0];
