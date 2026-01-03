@@ -20,7 +20,7 @@ const int block_size = 64;
 const int max_iters = 100;
 // const int max_iters = 3000;
 // const int eval_interval = 300;
-const int eval_interval = 100;
+const int eval_interval = 10;
 const int save_iters = 10;  // Save checkpoint every N iterations
 const float learning_rate = 1e-3f;
 // const int eval_iters = 50;
@@ -444,6 +444,11 @@ public:
             Tensor logits_flat = logits.reshape({B * T, vocab_size});
             // cout << "[GPT::forward] Reshaping targets to (B*T,)" << endl;
             Tensor targets_flat = targets->reshape({B * T});
+            
+            // cout<<"logits_flat: "<<endl;
+            // logits_flat.print_tensor();
+            // cout<<"targets_flat: "<<endl;
+            // targets_flat.print_tensor();
 
             // Cross entropy loss
             // cout << "[GPT::forward] Computing cross_entropy" << endl;
@@ -683,7 +688,7 @@ int main(int argc, char* argv[]) {
         // Save checkpoint if enabled
         if(save_checkpoint) {
             if(iter % save_iters == 0 || iter == max_iters - 1) {
-                string checkpoint_name = "checkpoint_iter_" + to_string(iter) + ".safetensors";
+                string checkpoint_name = "checkpoint_iter_" + to_string(iter%35) + ".safetensors";
                 auto state_dict = model.state_dict();
                 write_safe_tensors(state_dict, checkpoint_name);
             }

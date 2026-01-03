@@ -229,7 +229,10 @@ void launch_multiply(const Tensor& a, const Tensor& b, Tensor& result){
 __global__ void divide_kernel(TensorStruct a, TensorStruct b, TensorStruct c){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if(idx >= c.data_size) return;
-    c.data[idx] = a.data[idx] / b.data[idx];
+    // Add epsilon to prevent division by zero (same as CPU version uses 1e-9f in other places)
+    // TODO: FIGURE OUT WHY THIS LINE CAUSES NAN, SOMETHING LEADING TO B.DATA[IDX] BEING 0 AND NOT HANDLING PROPERLY
+    c.data[idx] = a.data[idx] / (b.data[idx]);
+    // c.data[idx] = a.data[idx] / (b.data[idx] + 1e-9f);
 }
 
 void launch_divide(const Tensor& a, const Tensor& b, Tensor& result){
